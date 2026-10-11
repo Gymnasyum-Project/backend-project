@@ -43,8 +43,9 @@ exports.list = async ({ page, limit, search, risk, segment, sort } = {}) => {
         `
         return { items: rows, meta: { page: pageNum, limit: limitNum } }
     }
-
+    
     const where = {
+        deleted_at: null, 
         ...(search && { full_name: { contains: search, mode: 'insensitive' } }),
         ...(segment && { segment })
     }
@@ -68,19 +69,40 @@ exports.create = (data)=> prisma.customers.create({data:
     }
 })
 
-exports.getDetail = async(id) =>{
-    const customer = await prisma.customers.findUnique({
-        where: {id},
-        include: {
-            customer_packages: {include:{packages:true}},
-            attendance:{orderBy:{scheduled_at: 'desc'}, take:20},
-            risk_predictions: {orderBy: {predicted_at:'desc'}, take:1}
-        }
-    });
-    if(!customer) throw new AppError(404, 'Not Found', 'Customer tidak ditemukan')
-    return customer
-} 
+// exports.getDetail = async(id) =>{
+//     const customer = await prisma.customers.findFirst({
+//         where: {id, deleted_at: null},
+//         include: {
+//             customer_packages: {include:{packages:true}},
+//             attendance:{orderBy:{scheduled_at: 'desc'}, take:20},
+//             risk_predictions: {orderBy: {predicted_at:'desc'}, take:1}
+//         }
+//     });
+    
+//     if(!customer) throw new AppError(404, 'Not Found', 'Customer tidak ditemukan')
+//     return customer
+// } 
 
+exports.getDetail = async (id) => {
+  // Gunakan findFirst agar kita bisa memfilter berdasarkan id dan deleted_at sekaligus
+  const customer = await prisma.customers.findFirst({
+    where: {
+      id: Number(id),
+      deleted_at: null, // Sekarang ini aman digunakan karena findFirst mendukung filter bebas
+    },
+    include: {
+      customer_packages: { include: { packages: true } },
+      attendance: { orderBy: { scheduled_at: 'desc' }, take: 20 },
+      risk_predictions: { orderBy: { predicted_at: 'desc' }, take: 1 },
+    },
+  });
+
+  if (!customer) {
+    throw new AppError(404, 'NOT_FOUND', 'Customer tidak ditemukan');
+  }
+
+  return customer;
+};
 
 exports.update = async (id, data) => {
     await exports.getDetail(id)
@@ -90,4 +112,12 @@ exports.update = async (id, data) => {
     if ('join_date' in payload) payload.join_date = toDate(payload.join_date)
 
     return prisma.customers.update({ where: { id }, data: payload })
+}
+
+exports.delete = async(id)=>{
+    await exports.getDetail(id);
+    return prisma.customers.update({
+        where: {id},
+        data: {deleted_at: new Date()},
+ });
 }

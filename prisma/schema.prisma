@@ -38,6 +38,7 @@ model customers {
   join_date    DateTime? @db.Date
   notes        String?
   created_at   DateTime? @default(now())
+  deleted_at DateTime? 
 
   customer_packages customer_packages[]
   attendance        attendance[]
@@ -45,6 +46,7 @@ model customers {
   risk_predictions  risk_predictions[]
   ai_summaries      ai_summaries[]
   followup_logs     followup_logs[]
+  
 }
 
 // ==========================

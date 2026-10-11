@@ -10,5 +10,6 @@ router.get('/', validate(v.list), ctrl.list);
 router.post('/', validate(v.create), ctrl.create);
 router.get('/:id', validate(v.detailParams), ctrl.detail);
 router.patch('/:id', validate(v.update), ctrl.update);
+router.delete('/:id', validate(v.detailParams), ctrl.delete);
 
 module.exports = router;
