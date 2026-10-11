@@ -1,0 +1,198 @@
+// schema.prisma
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql" 
+}
+
+// ==========================
+// Users (Admin)
+// ==========================
+model users {
+  id            Int       @id @default(autoincrement())
+  name          String?   @db.VarChar(100)
+  email         String?   @unique @db.VarChar(150)
+  password_hash String?   @db.VarChar(225)
+  role          String?   @default("admin") @db.VarChar(20)
+  created_at    DateTime? @default(now())
+
+  ai_summaries  ai_summaries[]
+  followup_logs followup_logs[]
+}
+
+// ==========================
+// Customers
+// ==========================
+model customers {
+  id           Int       @id @default(autoincrement())
+  full_name    String    @db.VarChar(100)
+  phone        String?   @db.VarChar(20)
+  email        String?   @db.VarChar(150)
+  gender       String?   @db.VarChar(10)
+  birth_date   DateTime? @db.Date
+  segment      String?   @db.VarChar(30)
+  service_type String?   @db.VarChar(20)
+  join_date    DateTime? @db.Date
+  notes        String?
+  created_at   DateTime? @default(now())
+
+  customer_packages customer_packages[]
+  attendance        attendance[]
+  reminders         reminders[]
+  risk_predictions  risk_predictions[]
+  ai_summaries      ai_summaries[]
+  followup_logs     followup_logs[]
+}
+
+// ==========================
+// Packages (master)
+// ==========================
+model packages {
+  id             Int      @id @default(autoincrement())
+  name           String?  @db.VarChar(100)
+  service_type   String?  @db.VarChar(20)
+  total_sessions Int?
+  duration_days  Int?
+  price          Decimal? @db.Decimal(12, 2)
+
+  customer_packages customer_packages[]
+}
+
+// ==========================
+// Customer Packages
+// ==========================
+model customer_packages {
+  id                  Int       @id @default(autoincrement())
+  customer_id         Int
+  package_id          Int
+  start_date          DateTime? @db.Date
+  end_date            DateTime? @db.Date
+  total_sessions      Int?
+  remaining_sessions  Int?
+  status              String?   @db.VarChar(20)
+
+  customers  customers    @relation(fields: [customer_id], references: [id])
+  packages   packages     @relation(fields: [package_id], references: [id])
+  attendance attendance[]
+}
+
+// ==========================
+// Attendance
+// ==========================
+model attendance {
+  id                   Int       @id @default(autoincrement())
+  customer_id          Int
+  customer_package_id  Int
+  scheduled_at         DateTime?
+  status               String?   @db.VarChar(20)
+  checkin_at           DateTime?
+  coach_name           String?   @db.VarChar(100)
+
+  customers          customers          @relation(fields: [customer_id], references: [id])
+  customer_packages  customer_packages  @relation(fields: [customer_package_id], references: [id])
+  reschedules        reschedules[]
+}
+
+// ==========================
+// Reschedules
+// ==========================
+model reschedules {
+  id            Int       @id @default(autoincrement())
+  attendance_id Int
+  old_schedule  DateTime?
+  new_schedule  DateTime?
+  reason        String?
+  requested_at  DateTime?
+
+  attendance attendance @relation(fields: [attendance_id], references: [id])
+}
+
+// ==========================
+// Reminders
+// ==========================
+model reminders {
+  id              Int       @id @default(autoincrement())
+  customer_id     Int
+  channel         String?   @default("whatsapp") @db.VarChar(20)
+  sent_at         DateTime?
+  response_status String?   @db.VarChar(20)
+  responded_at    DateTime?
+
+  customers customers @relation(fields: [customer_id], references: [id])
+}
+
+// ==========================
+// Model Versions
+// ==========================
+model model_versions {
+  id          Int       @id @default(autoincrement())
+  version     String?   @db.VarChar(30)
+  algorithm   String?   @db.VarChar(50)
+  metrics     Json?
+  trained_at  DateTime?
+  is_active   Boolean?  @default(false)
+
+  risk_predictions risk_predictions[]
+}
+
+// ==========================
+// Risk Predictions
+// ==========================
+model risk_predictions {
+  id                Int       @id @default(autoincrement())
+  customer_id       Int
+  model_version_id  Int
+  label             String?   @db.VarChar(20)
+  probabilities     Json?
+  features          Json?
+  top_factors       Json?
+  priority_score    Decimal?  @db.Decimal(5, 2)
+  predicted_at      DateTime? @default(now())
+
+  customers      customers      @relation(fields: [customer_id], references: [id])
+  model_versions model_versions @relation(fields: [model_version_id], references: [id])
+  ai_summaries   ai_summaries[]
+}
+
+// ==========================
+// AI Summaries
+// ==========================
+model ai_summaries {
+  id              Int       @id @default(autoincrement())
+  customer_id     Int
+  prediction_id   Int
+  summary         String?
+  followup_draft  String?
+  edited_draft    String?
+  llm_model       String?   @db.VarChar(50)
+  prompt_version  String?   @db.VarChar(20)
+  status          String?   @default("draft") @db.VarChar(20)
+  created_by      Int
+  created_at      DateTime? @default(now())
+
+  customers        customers        @relation(fields: [customer_id], references: [id])
+  risk_predictions risk_predictions @relation(fields: [prediction_id], references: [id])
+  users            users            @relation(fields: [created_by], references: [id])
+  followup_logs    followup_logs[]
+}
+
+// ==========================
+// Followup Logs
+// ==========================
+model followup_logs {
+  id           Int       @id @default(autoincrement())
+  customer_id  Int
+  summary_id   Int
+  action       String?   @db.VarChar(30)
+  outcome      String?   @db.VarChar(30)
+  note         String?
+  acted_by     Int
+  acted_at     DateTime? @default(now())
+
+  customers    customers    @relation(fields: [customer_id], references: [id])
+  ai_summaries ai_summaries @relation(fields: [summary_id], references: [id])
+  users        users        @relation(fields: [acted_by], references: [id])
+}
