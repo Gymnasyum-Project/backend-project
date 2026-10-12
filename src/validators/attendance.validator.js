@@ -1,7 +1,7 @@
 const Joi = require('joi');
 const {idParam} = require('./common.validator')
 
-const STATUS = ['attendance', 'missed', 'rescheduled', 'cancelled'];
+const STATUS = ['attended', 'missed', 'rescheduled', 'cancelled'];
 
 exports.list = {
     query: Joi.object({
@@ -14,7 +14,7 @@ exports.create = {
         customer_id: Joi.number().integer().positive().required(),
         customer_package_id: Joi.number().integer().positive().required(),
         scheduled_at: Joi.date().required(),
-        status: Joi.string().valid(...STATUS).default('attendance'),
+        status: Joi.string().valid(...STATUS).default('attended'),
         coach_name:Joi.string().max(100).allow(null, '')
     })
 }

@@ -2,7 +2,7 @@ const router = require('express').Router();
 
 router.use('/auth', require('./auth.routes'));
 router.use('/customers', require('./customer.routes'));
-// router.use('/attendance', require('./attendance.routes'));
+router.use('/attendance', require('./attendance.routes'));
 // router.use('/packages', require('./package.routes'));
 // router.use('/customer-packages', require('./package.routes'));
 // router.use('/reschedules', require('./reschedule.routes'));
