@@ -69,20 +69,6 @@ exports.create = (data)=> prisma.customers.create({data:
     }
 })
 
-// exports.getDetail = async(id) =>{
-//     const customer = await prisma.customers.findFirst({
-//         where: {id, deleted_at: null},
-//         include: {
-//             customer_packages: {include:{packages:true}},
-//             attendance:{orderBy:{scheduled_at: 'desc'}, take:20},
-//             risk_predictions: {orderBy: {predicted_at:'desc'}, take:1}
-//         }
-//     });
-    
-//     if(!customer) throw new AppError(404, 'Not Found', 'Customer tidak ditemukan')
-//     return customer
-// } 
-
 exports.getDetail = async (id) => {
   // Gunakan findFirst agar kita bisa memfilter berdasarkan id dan deleted_at sekaligus
   const customer = await prisma.customers.findFirst({
