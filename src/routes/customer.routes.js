@@ -3,6 +3,7 @@ const ctrl = require('../controllers/customer.controller.js')
 const validate = require('../middlewares/validate')
 const authentication = require('../middlewares/authentication')
 const v = require('../validators/customer.validator.js')
+const { idParam } = require('../validators/common.validator.js')
 
 router.use(authentication);
 
@@ -11,5 +12,6 @@ router.post('/', validate(v.create), ctrl.create);
 router.get('/:id', validate(v.detailParams), ctrl.detail);
 router.patch('/:id', validate(v.update), ctrl.update);
 router.delete('/:id', validate(v.detailParams), ctrl.delete);
+router.get('/:id/reschedules', validate({ params: idParam }), ctrl.listReschedules)
 
 module.exports = router;

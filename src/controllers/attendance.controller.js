@@ -21,3 +21,4 @@ exports.updateStatus = async(req, res) => ok(res, await service.updateStatus(req
 exports.reschedule = async(req, res)=> {
     console.log(req.validate.body)
     ok(res, await service.reschedules(req.validate.params.id, req.validate.body))}
+

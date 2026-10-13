@@ -37,3 +37,10 @@ exports.reschedules = async(attendanceId,{new_schedule, reason})=>{
         data:  {status: 'rescheduled', scheduled_at: new_schedule},
     })
 }
+
+exports.listReschedulesByCustomer = (customerId) =>
+  prisma.reschedules.findMany({
+    where: { attendance: { customer_id: customerId } },
+    include: { attendance: true },
+    orderBy: { id: 'desc' },
+  });

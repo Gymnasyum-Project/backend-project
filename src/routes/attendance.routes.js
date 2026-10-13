@@ -9,7 +9,7 @@ router.use(authentication);
 
 router.get('/', validate(v.list), ctrl.list);
 router.post('/', validate(v.create), ctrl.created)
-router.patch('/:id', validate({param: idParam, ...v.update}), ctrl.updateStatus)
+router.patch('/:id', validate({params: idParam, ...v.update}), ctrl.updateStatus)
 router.post('/:id/reschedule', validate(v.reschedule), ctrl.reschedule)
 
 module.exports = router
