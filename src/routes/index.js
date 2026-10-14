@@ -6,6 +6,10 @@ router.use('/attendance', require('./attendance.routes'));
 router.use('/packages', require('./package.routes'));
 router.use('/customer-packages', require('./package.routes'));
 router.use('/reminders', require('./reminder.routes'));
+
+//Halaman Dashboard
+router.use('/dashboard', require('./dashboard.routes'));
+
 // router.use('/predict', require('./predict.routes'));
 // router.use('/ai', require('./ai.routes'));
 // router.use('/followups', require('./followup.routes'));
