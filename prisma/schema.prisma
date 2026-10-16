@@ -16,6 +16,7 @@ model users {
   name          String?   @db.VarChar(100)
   email         String?   @unique @db.VarChar(150)
   password_hash String?   @db.VarChar(225)
+  no_tlp        String?   @db.VarChar(20)
   role          String?   @default("admin") @db.VarChar(20)
   created_at    DateTime? @default(now())
 

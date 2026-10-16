@@ -3,6 +3,7 @@ const featureService = require('./feature.service');
 const inference = require('../integrations/inference.client');
 const { calcPriority } = require('../utils/priority');
 const AppError = require('../utils/AppError');
+const { listCustomerPackages } = require('./package.service');
 
 exports.predictCustomer = async (customerId) => {
   const customer = await prisma.customers.findUnique({ where: { id: customerId } });
@@ -12,6 +13,7 @@ exports.predictCustomer = async (customerId) => {
   const result = await inference.predict(features);
 
   const activeModel = await prisma.model_versions.findFirst({ where: { is_active: true } });
+  if(!activeModel) throw new AppError(409, 'NO_ACTIVE_MODEL', 'Belum ada model AI yang aktif')
 
   return prisma.risk_predictions.create({
     data: {
@@ -38,4 +40,18 @@ exports.batchPredict = async () => {
     }
   }
   return results;
+};
+
+exports.getHistory = async(customerId, limit)=>{
+  const customer = await prisma.customers.findUnique({where: {id:customerId}});
+  if(!customer)  throw new AppError(404,'Not Found', 'Customer tidak ditemukan');
+
+  return prisma.risk_predictions.findMany({
+    where: {customer_id: customerId},
+    orderBy: {predicted_at:'desc'},
+    take: limit,
+    include: {
+      model_versions: {select:{version: true, algorithm: true}}
+    },
+  });
 };

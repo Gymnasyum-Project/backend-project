@@ -1,15 +1,24 @@
 const Joi = require('joi');
 
 exports.featureSchema = Joi.object({
-  attendance_rate_30d: Joi.number().min(0).max(1).required(),
-  missed_count_30d: Joi.number().integer().min(0).required(),
-  reschedule_count_30d: Joi.number().integer().min(0).required(),
-  remaining_sessions: Joi.number().integer().min(0).required(),
-  remaining_ratio: Joi.number().min(0).max(1).required(),
+  attendance_frequency_30d: Joi.number().integer().min(0).required(),
+  missed_session_count_30d: Joi.number().integer().min(0).required(),
+  reschedule_frequency_30d: Joi.number().integer().min(0).required(),
+  remaining_package_sessions: Joi.number().integer().min(0).required(),
+  days_until_package_expiry: Joi.number().integer().min(0).required(),
   days_since_last_visit: Joi.number().integer().min(0).required(),
-  reminder_response_rate: Joi.number().min(0).max(1).required(),
+  reminder_count_30d: Joi.number().integer().min(0).required(),
+  reminder_response_count_30d: Joi.number().integer().min(0).required(),
 });
 
 exports.predictParams = Joi.object({
   customerId: Joi.number().integer().positive().required(),
+});
+
+exports.historyParams = Joi.object({
+  id: Joi.number().integer().positive().required(),
+});
+
+exports.historyQuery = Joi.object({
+  limit: Joi.number().integer().min(1).max(100).default(20),
 });

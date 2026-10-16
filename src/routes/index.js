@@ -10,8 +10,9 @@ router.use('/reminders', require('./reminder.routes'));
 //Halaman Dashboard
 router.use('/dashboard', require('./dashboard.routes'));
 
-// router.use('/predict', require('./predict.routes'));
-// router.use('/ai', require('./ai.routes'));
-// router.use('/followups', require('./followup.routes'));
+router.use('/model-versions', require('./model.routes'));
+router.use('/predict', require('./predict.routes'));
+router.use('/ai', require('./ai.routes'));
+router.use('/followups', require('./followup.routes'));
 
 module.exports = router;

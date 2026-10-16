@@ -45,9 +45,10 @@ async function main() {
 
   console.log("Membuat user admin...");
   const passwordHash = await bcrypt.hash("admin123", 10);
-  await prisma.users.create({
+  const adminUser = await prisma.users.create({
     data: {
       name: "Admin Gymnasyum",
+      no_tlp: "082235543178",
       email: "admin@gymnasyum.id",
       password_hash: passwordHash,
       role: "admin",
@@ -86,7 +87,8 @@ async function main() {
       is_active: false,
     },
   });
-  await prisma.model_versions.create({
+  // Disimpan ke variabel karena id-nya dipakai lagi nanti di risk_predictions
+  const activeModel = await prisma.model_versions.create({
     data: {
       version: "v1.1-random-forest",
       algorithm: "Random Forest",
@@ -136,6 +138,18 @@ async function main() {
     ...Array(11).fill("medium"),
     ...Array(7).fill("high"),
   ].sort(() => Math.random() - 0.5);
+
+  const labelByProfile = {
+    low: "Active",
+    medium: "Need Attention",
+    high: "At Risk",
+  };
+
+  const probabilitiesByLabel = {
+    Active: { Active: 0.75, "Need Attention": 0.18, "At Risk": 0.07 },
+    "Need Attention": { Active: 0.2, "Need Attention": 0.55, "At Risk": 0.25 },
+    "At Risk": { Active: 0.05, "Need Attention": 0.2, "At Risk": 0.75 },
+  };
 
   for (let i = 0; i < NAMES.length; i++) {
     const profile = riskProfiles[i];
@@ -220,6 +234,7 @@ async function main() {
     }
 
     const reminderCount = randomInt(2, 4);
+    let reminderRespondedCount = 0;
     for (let k = 0; k < reminderCount; k++) {
       const responded =
         profile === "low"
@@ -227,6 +242,7 @@ async function main() {
           : profile === "medium"
             ? Math.random() < 0.4
             : Math.random() < 0.15;
+      if (responded) reminderRespondedCount++;
 
       await prisma.reminders.create({
         data: {
@@ -238,12 +254,54 @@ async function main() {
         },
       });
     }
+
+    // 1. Buat risk_predictions dulu, karena ai_summaries wajib terhubung ke sini
+    const label = labelByProfile[profile];
+    const riskPrediction = await prisma.risk_predictions.create({
+      data: {
+        customers: { connect: { id: customer.id } },
+        model_versions: { connect: { id: activeModel.id } },
+        label,
+        probabilities: probabilitiesByLabel[label],
+        features: {
+          attendance_frequency_30d: attendedCount,
+          missed_session_count_30d: missedCount,
+          reschedule_frequency_30d: totalJadwal - attendedCount - missedCount,
+          remaining_package_sessions: remainingSessions,
+          days_until_package_expiry: randomInt(1, 30),
+          days_since_last_visit: lastAttendedDay ?? 999,
+          reminder_count_30d: reminderCount,
+          reminder_response_count_30d: reminderRespondedCount,
+        },
+        top_factors: ["days_since_last_visit", "missed_session_count_30d"],
+        priority_score:
+          label === "At Risk"
+            ? randomInt(70, 100)
+            : label === "Need Attention"
+              ? randomInt(30, 69)
+              : randomInt(0, 29),
+      },
+    });
+
+    // 2. Baru ai_summaries, terhubung ke customer + risk_prediction di atas
+    await prisma.ai_summaries.create({
+      data: {
+        customers: { connect: { id: customer.id } },
+        risk_predictions: { connect: { id: riskPrediction.id } },
+        users: { connect: { id: adminUser.id } },
+        llm_model: "manual-seed",
+        summary: `Customer ${NAMES[i]} berada pada kategori risiko ${label}. Kehadiran 30 hari terakhir: ${attendedCount}x hadir, ${missedCount}x absen.`,
+        followup_draft: `Halo Kak ${NAMES[i]}, kami lihat sudah agak lama tidak latihan nih. Yuk balik lagi ke gym, ada jadwal kosong minggu ini!`,
+        prompt_version: "v1-seed",
+        status: "pending_review",
+      },
+    });
   }
 
   console.log("Seed selesai!");
   console.log(`- 1 admin (email: admin@gymnasyum.id, password: admin123)`);
   console.log(
-    `- ${NAMES.length} customer dengan riwayat attendance & reminder`,
+    `- ${NAMES.length} customer dengan riwayat attendance, reminder, risk_prediction & ai_summary`,
   );
   console.log(`- 2 master paket`);
   console.log(`- 2 model_versions`);
