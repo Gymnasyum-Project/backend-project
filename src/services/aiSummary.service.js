@@ -41,9 +41,12 @@ exports.generate = async (customerId, userId, { regenerate = false } = {}) => {
   });
 };
 
-exports.updateSummary = async (id, { edited_draft, status }) => {
-  return prisma.ai_summaries.update({
-    where: { id },
-    data: { ...(edited_draft && { edited_draft }), ...(status && { status }) },
-  });
-};
+exports.updateSummary = async (id, data)=>{
+  const exiting = await prisma.ai_summaries.findUnique({where: {id}});
+  if(!exiting)throw new AppError(404, 'Not Found', 'Summary tidak ditemukan')
+
+    return prisma.ai_summaries.update({
+      where:{id},
+      data
+    })
+}
