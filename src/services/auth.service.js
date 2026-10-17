@@ -23,6 +23,23 @@ exports.login = async (email, password) => {
   };
 };
 
+exports.registrasi = async(email, name, no_tlp, password)=>{
+  const exiting = await prisma.users.findUnique({where: {email}})
+  if(exiting) throw new AppError(409, 'Email already used', 'email sudah di gunakan')
+  
+    const hashPassword = await bcrypt.hash(password, 10)
+    
+    const user = await prisma.users.create({
+    data: {
+      name, email, no_tlp, password_hash: hashPassword, role: 'admin' 
+    }
+  })
+
+  const {password: _, ...safeUser} = user;
+  return safeUser
+}
+
+
 exports.getProfile = async (userId) => {
   const user = await prisma.users.findUnique({
     where: { id: userId },

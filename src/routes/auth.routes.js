@@ -6,6 +6,7 @@ const { auth: authLimiter } = require('../middlewares/rateLimiter');
 const v = require('../validators/auth.validator');
 
 router.post('/login', authLimiter, validate(v.login), ctrl.login);
+router.post('/registrasi', validate(v.registrasi), ctrl.registrasi)
 router.get('/me', authenticate, ctrl.me);   
 router.post('/logout', authenticate, ctrl.logout)
 
