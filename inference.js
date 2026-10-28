@@ -8,7 +8,7 @@ app.post("/predict", (req, res) => {
 
   // Jawaban palsu, tapi formatnya sesuai kontrak
   res.json({
-    label: "Active",
+    label: "Need Attention",
     probabilities: { Active: 0.05, "Need Attention": 0.13, "At Risk": 0.82 },
     top_factors: [
       "kehadiran rendah",

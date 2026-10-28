@@ -4,8 +4,14 @@ const attendanceService = require('../services/attendance.service');
 const {ok, created} = require('../utils/response')
 
 exports.list = async(req, res)=>{
-    const {items, meta} =await service.list(req.validate.query);
-    ok(res, items, meta);
+    // const {items, meta} =await service.list(req.validate.query);
+    const result = await service.list(req.validate.query)
+    res.json({
+      success:true,
+      data:result.items,
+      meta:result.meta,
+    })
+    // ok(res, items, meta);
 } 
 exports.create = async (req, res) => {
   const result = await service.create(req.validate.body);
