@@ -159,7 +159,6 @@ async function main() {
         full_name: NAMES[i],
         phone: `08${randomInt(10, 99)}-${randomInt(1000, 9999)}-${randomInt(1000, 9999)}`,
         email: `${NAMES[i].toLowerCase().replace(/\s/g, ".")}@email.com`,
-        gender: i % 2 === 0 ? "female" : "male",
         birth_date: daysAgo(randomInt(8000, 20000)),
         segment: randomFrom(SEGMENTS),
         service_type: randomFrom(SERVICES),

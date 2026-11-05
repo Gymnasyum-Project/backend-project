@@ -32,7 +32,6 @@ model customers {
   full_name    String    @db.VarChar(100)
   phone        String?   @db.VarChar(20)
   email        String?   @db.VarChar(150)
-  gender       String?   @db.VarChar(10)
   birth_date   DateTime? @db.Date
   segment      String?   @db.VarChar(30)
   service_type String?   @db.VarChar(20)

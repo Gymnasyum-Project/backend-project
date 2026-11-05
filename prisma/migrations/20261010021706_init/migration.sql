@@ -6,7 +6,6 @@ CREATE TABLE "users" (
     "password_hash" VARCHAR(225),
     "role" VARCHAR(20) DEFAULT 'admin',
     "created_at" TIMESTAMP(3) DEFAULT CURRENT_TIMESTAMP,
-
     CONSTRAINT "users_pkey" PRIMARY KEY ("id")
 );
 
@@ -16,14 +15,12 @@ CREATE TABLE "customers" (
     "full_name" VARCHAR(100) NOT NULL,
     "phone" VARCHAR(20),
     "email" VARCHAR(150),
-    "gender" VARCHAR(10),
     "birth_date" DATE,
     "segment" VARCHAR(30),
     "service_type" VARCHAR(20),
     "join_date" DATE,
     "notes" TEXT,
     "created_at" TIMESTAMP(3) DEFAULT CURRENT_TIMESTAMP,
-
     CONSTRAINT "customers_pkey" PRIMARY KEY ("id")
 );
 
@@ -34,8 +31,7 @@ CREATE TABLE "packages" (
     "service_type" VARCHAR(20),
     "total_sessions" INTEGER,
     "duration_days" INTEGER,
-    "price" DECIMAL(12,2),
-
+    "price" DECIMAL(12, 2),
     CONSTRAINT "packages_pkey" PRIMARY KEY ("id")
 );
 
@@ -49,7 +45,6 @@ CREATE TABLE "customer_packages" (
     "total_sessions" INTEGER,
     "remaining_sessions" INTEGER,
     "status" VARCHAR(20),
-
     CONSTRAINT "customer_packages_pkey" PRIMARY KEY ("id")
 );
 
@@ -62,7 +57,6 @@ CREATE TABLE "attendance" (
     "status" VARCHAR(20),
     "checkin_at" TIMESTAMP(3),
     "coach_name" VARCHAR(100),
-
     CONSTRAINT "attendance_pkey" PRIMARY KEY ("id")
 );
 
@@ -74,7 +68,6 @@ CREATE TABLE "reschedules" (
     "new_schedule" TIMESTAMP(3),
     "reason" TEXT,
     "requested_at" TIMESTAMP(3),
-
     CONSTRAINT "reschedules_pkey" PRIMARY KEY ("id")
 );
 
@@ -86,7 +79,6 @@ CREATE TABLE "reminders" (
     "sent_at" TIMESTAMP(3),
     "response_status" VARCHAR(20),
     "responded_at" TIMESTAMP(3),
-
     CONSTRAINT "reminders_pkey" PRIMARY KEY ("id")
 );
 
@@ -98,7 +90,6 @@ CREATE TABLE "model_versions" (
     "metrics" JSONB,
     "trained_at" TIMESTAMP(3),
     "is_active" BOOLEAN DEFAULT false,
-
     CONSTRAINT "model_versions_pkey" PRIMARY KEY ("id")
 );
 
@@ -111,9 +102,8 @@ CREATE TABLE "risk_predictions" (
     "probabilities" JSONB,
     "features" JSONB,
     "top_factors" JSONB,
-    "priority_score" DECIMAL(5,2),
+    "priority_score" DECIMAL(5, 2),
     "predicted_at" TIMESTAMP(3) DEFAULT CURRENT_TIMESTAMP,
-
     CONSTRAINT "risk_predictions_pkey" PRIMARY KEY ("id")
 );
 
@@ -130,7 +120,6 @@ CREATE TABLE "ai_summaries" (
     "status" VARCHAR(20) DEFAULT 'draft',
     "created_by" INTEGER NOT NULL,
     "created_at" TIMESTAMP(3) DEFAULT CURRENT_TIMESTAMP,
-
     CONSTRAINT "ai_summaries_pkey" PRIMARY KEY ("id")
 );
 
@@ -144,51 +133,64 @@ CREATE TABLE "followup_logs" (
     "note" TEXT,
     "acted_by" INTEGER NOT NULL,
     "acted_at" TIMESTAMP(3) DEFAULT CURRENT_TIMESTAMP,
-
     CONSTRAINT "followup_logs_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateIndex
-CREATE UNIQUE INDEX "users_email_key" ON "users"("email");
+CREATE UNIQUE INDEX "users_email_key" ON "users" ("email");
 
 -- AddForeignKey
-ALTER TABLE "customer_packages" ADD CONSTRAINT "customer_packages_customer_id_fkey" FOREIGN KEY ("customer_id") REFERENCES "customers"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "customer_packages"
+ADD CONSTRAINT "customer_packages_customer_id_fkey" FOREIGN KEY ("customer_id") REFERENCES "customers" ("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "customer_packages" ADD CONSTRAINT "customer_packages_package_id_fkey" FOREIGN KEY ("package_id") REFERENCES "packages"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "customer_packages"
+ADD CONSTRAINT "customer_packages_package_id_fkey" FOREIGN KEY ("package_id") REFERENCES "packages" ("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "attendance" ADD CONSTRAINT "attendance_customer_id_fkey" FOREIGN KEY ("customer_id") REFERENCES "customers"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "attendance"
+ADD CONSTRAINT "attendance_customer_id_fkey" FOREIGN KEY ("customer_id") REFERENCES "customers" ("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "attendance" ADD CONSTRAINT "attendance_customer_package_id_fkey" FOREIGN KEY ("customer_package_id") REFERENCES "customer_packages"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "attendance"
+ADD CONSTRAINT "attendance_customer_package_id_fkey" FOREIGN KEY ("customer_package_id") REFERENCES "customer_packages" ("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "reschedules" ADD CONSTRAINT "reschedules_attendance_id_fkey" FOREIGN KEY ("attendance_id") REFERENCES "attendance"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "reschedules"
+ADD CONSTRAINT "reschedules_attendance_id_fkey" FOREIGN KEY ("attendance_id") REFERENCES "attendance" ("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "reminders" ADD CONSTRAINT "reminders_customer_id_fkey" FOREIGN KEY ("customer_id") REFERENCES "customers"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "reminders"
+ADD CONSTRAINT "reminders_customer_id_fkey" FOREIGN KEY ("customer_id") REFERENCES "customers" ("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "risk_predictions" ADD CONSTRAINT "risk_predictions_customer_id_fkey" FOREIGN KEY ("customer_id") REFERENCES "customers"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "risk_predictions"
+ADD CONSTRAINT "risk_predictions_customer_id_fkey" FOREIGN KEY ("customer_id") REFERENCES "customers" ("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "risk_predictions" ADD CONSTRAINT "risk_predictions_model_version_id_fkey" FOREIGN KEY ("model_version_id") REFERENCES "model_versions"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "risk_predictions"
+ADD CONSTRAINT "risk_predictions_model_version_id_fkey" FOREIGN KEY ("model_version_id") REFERENCES "model_versions" ("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "ai_summaries" ADD CONSTRAINT "ai_summaries_customer_id_fkey" FOREIGN KEY ("customer_id") REFERENCES "customers"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "ai_summaries"
+ADD CONSTRAINT "ai_summaries_customer_id_fkey" FOREIGN KEY ("customer_id") REFERENCES "customers" ("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "ai_summaries" ADD CONSTRAINT "ai_summaries_prediction_id_fkey" FOREIGN KEY ("prediction_id") REFERENCES "risk_predictions"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "ai_summaries"
+ADD CONSTRAINT "ai_summaries_prediction_id_fkey" FOREIGN KEY ("prediction_id") REFERENCES "risk_predictions" ("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "ai_summaries" ADD CONSTRAINT "ai_summaries_created_by_fkey" FOREIGN KEY ("created_by") REFERENCES "users"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "ai_summaries"
+ADD CONSTRAINT "ai_summaries_created_by_fkey" FOREIGN KEY ("created_by") REFERENCES "users" ("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "followup_logs" ADD CONSTRAINT "followup_logs_customer_id_fkey" FOREIGN KEY ("customer_id") REFERENCES "customers"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "followup_logs"
+ADD CONSTRAINT "followup_logs_customer_id_fkey" FOREIGN KEY ("customer_id") REFERENCES "customers" ("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "followup_logs" ADD CONSTRAINT "followup_logs_summary_id_fkey" FOREIGN KEY ("summary_id") REFERENCES "ai_summaries"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "followup_logs"
+ADD CONSTRAINT "followup_logs_summary_id_fkey" FOREIGN KEY ("summary_id") REFERENCES "ai_summaries" ("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "followup_logs" ADD CONSTRAINT "followup_logs_acted_by_fkey" FOREIGN KEY ("acted_by") REFERENCES "users"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "followup_logs"
+ADD CONSTRAINT "followup_logs_acted_by_fkey" FOREIGN KEY ("acted_by") REFERENCES "users" ("id") ON DELETE RESTRICT ON UPDATE CASCADE;
