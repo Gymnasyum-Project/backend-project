@@ -17,7 +17,7 @@ exports.create = {
     status: Joi.string()
       .valid(...STATUS)
       .default("attended"),
-    checkin_at: Joi.date().allow(null),
+    checkin_at: Joi.string().allow(null, ""),
     coach_name: Joi.string().max(100).allow(null, ""),
   }),
 };
@@ -39,3 +39,4 @@ exports.reschedule = {
     reason: Joi.string().max(500).allow("", null),
   }),
 };
+

@@ -39,9 +39,9 @@ exports.assignToCustomer = async ({ customer_id, package_id, start_date }) => {
     },
   });
 };
-exports.getCustomerPackage = async (id) => {
-  const result = await prisma.customer_packages.findUnique({
-    where: { id },
+exports.getCustomerPackage = async (customerId) => {
+  const result = await prisma.customer_packages.findMany({
+    where: { customer_id: customerId },
     include: {
       packages: true,
       customers: {
@@ -51,6 +51,7 @@ exports.getCustomerPackage = async (id) => {
         },
       },
     },
+    orderBy: { start_date: "desc" },
   });
   if (!result) throw notFound("Package Customer Tidak Ditemukan");
   return result;
