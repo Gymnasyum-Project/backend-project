@@ -1,20 +1,22 @@
-const bcrypt = require('bcrypt');
-const jwt = require('jsonwebtoken');
-const prisma = require('../config/prisma');
-const env = require('../config/env');
-const AppError = require('../utils/AppError');
+const bcrypt = require("bcrypt");
+const jwt = require("jsonwebtoken");
+const prisma = require("../config/prisma");
+const env = require("../config/env");
+const AppError = require("../utils/AppError");
 
 exports.login = async (email, password) => {
   const user = await prisma.users.findUnique({ where: { email } });
-  if (!user) throw new AppError(401, 'INVALID_CREDENTIALS', 'Email atau password salah');
+  if (!user)
+    throw new AppError(401, "INVALID_CREDENTIALS", "Email atau password salah");
 
   const match = await bcrypt.compare(password, user.password_hash);
-  if (!match) throw new AppError(401, 'INVALID_CREDENTIALS', 'Email atau password salah');
+  if (!match)
+    throw new AppError(401, "INVALID_CREDENTIALS", "Email atau password salah");
 
   const token = jwt.sign(
     { id: user.id, role: user.role, name: user.name },
     env.JWT_SECRET,
-    { expiresIn: env.JWT_EXPIRES_IN }
+    { expiresIn: env.JWT_EXPIRES_IN },
   );
 
   return {
@@ -23,28 +25,46 @@ exports.login = async (email, password) => {
   };
 };
 
-exports.registrasi = async(email, name, no_tlp, password)=>{
-  const exiting = await prisma.users.findUnique({where: {email}})
-  if(exiting) throw new AppError(409, 'Email already used', 'email sudah di gunakan')
-  
-    const hashPassword = await bcrypt.hash(password, 10)
-    
-    const user = await prisma.users.create({
+exports.registrasi = async (email, name, no_tlp, password) => {
+  const exiting = await prisma.users.findUnique({ where: { email } });
+  if (exiting)
+    throw new AppError(409, "Email already used", "email sudah di gunakan");
+
+  const hashPassword = await bcrypt.hash(password, 10);
+
+  const user = await prisma.users.create({
     data: {
-      name, email, no_tlp, password_hash: hashPassword, role: 'admin' 
-    }
-  })
+      name,
+      email,
+      no_tlp,
+      password_hash: hashPassword,
+      role: "admin",
+    },
+  });
 
-  const {password: _, ...safeUser} = user;
-  return safeUser
-}
-
+  const { password: _, ...safeUser } = user;
+  return safeUser;
+};
 
 exports.getProfile = async (userId) => {
   const user = await prisma.users.findUnique({
     where: { id: userId },
-    select: { id: true, name: true, email: true, role: true, created_at: true },
+    select: {
+      id: true,
+      name: true,
+      email: true,
+      no_tlp: true,
+      role: true,
+      created_at: true,
+    },
   });
-  if (!user) throw new AppError(404, 'NOT_FOUND', 'User tidak ditemukan');
+  if (!user) throw new AppError(404, "NOT_FOUND", "User tidak ditemukan");
   return user;
+};
+exports.updateUser = async (id, { name, email, role }) => {
+  return prisma.users.update({
+    where: { id },
+    data: { name, email, role },
+    select: { id: true, name: true, email: true, role: true },
+  });
 };

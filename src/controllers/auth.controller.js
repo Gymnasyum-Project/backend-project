@@ -17,6 +17,17 @@ exports.registrasi = async (req, res, next) => {
   }
 };
 
+exports.updateUser = async (req, res, next) => {
+  console.log(req.validate.body);
+  try {
+    const id = req.user.id;
+    const { name, email, role } = req.validate.body;
+    const result = await service.updateUser(id, { name, email, role });
+    ok(res, result);
+  } catch (err) {
+    next(err);
+  }
+};
 exports.me = async (req, res) => {
   const result = await service.getProfile(req.user.id);
   ok(res, result);
