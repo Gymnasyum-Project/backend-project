@@ -8,6 +8,7 @@ const { general } = require("./middlewares/rateLimiter");
 const { notFound, errorHandler } = require("./middlewares/errorHandler");
 
 const app = express();
+app.set("trust proxy", 1);
 app.use(helmet());
 // app.use(cors({ origin: env.CORS_ORIGIN }));
 const allowedOrigins = String(env.CORS_ORIGIN || "")
