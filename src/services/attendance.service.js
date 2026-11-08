@@ -22,13 +22,48 @@ exports.list = (customerId) =>
 
 exports.create = (data) =>
   prisma.$transaction(async (tx) => {
-    const record = await tx.attendance.create({ data });
+    const pkg = await tx.customer_packages.findFirst({
+      where: {
+        id: data.customer_package_id,
+        customer_id: data.customer_id,
+        customers: { deleted_at: null },
+      },
+      select: { status: true, remaining_sessions: true },
+    });
+
+    if (!pkg)
+      throw new AppError(400, "PACKAGE_MISMATCH", "Paket tidak ditemukan");
+    if (pkg.status !== "active")
+      throw new AppError(409, "PACKAGE_NOT_ACTIVE", "Paket sudah tidak aktif");
+
+    // Perbaiki bagian ini: gunakan relasi 'connect' untuk Prisma
+    const record = await tx.attendance.create({
+      data: {
+        coach_name: data.coach_name,
+        status: data.status,
+        scheduled_at: data.scheduled_at,
+        checkin_at: data.checkin_at,
+        // Hubungkan relasi customers dan customer_packages menggunakan connect
+        customers: {
+          connect: { id: data.customer_id },
+        },
+        customer_packages: {
+          connect: { id: data.customer_package_id },
+        },
+      },
+    });
+
     if (consumesSession(record.status)) {
+      if (pkg.remaining_sessions <= 0)
+        throw new AppError(
+          409,
+          "NO_REMAINING_SESSIONS",
+          "Sisa paket sudah habis",
+        );
       await changeSessions(tx, record.customer_package_id, -1);
     }
     return record;
   });
-
 exports.updateStatus = async (id, { status, checkin_at }) => {
   const existing = await prisma.attendance.findUnique({ where: { id } });
   if (!existing)
@@ -88,3 +123,20 @@ exports.listReschedulesByCustomer = (customerId) =>
     include: { attendance: true },
     orderBy: { id: "desc" },
   });
+
+exports.listSessions = async (customerId) => {
+  await assertCustomerExists(customerId);
+  return prisma.attendance.findMany({
+    where: { customer_id: Number(customerId), status: { not: "cancelled" } },
+    orderBy: { scheduled_at: "desc" },
+    take: 30,
+    select: {
+      id: true,
+      scheduled_at: true,
+      status: true,
+      customer_packages: {
+        select: { packages: { select: { name: true, service_type: true } } },
+      },
+    },
+  });
+};

@@ -7,7 +7,13 @@ import "dotenv/config";
 import bcrypt from "bcrypt";
 
 // Inisialisasi Prisma v7 dengan Driver Adapter
-const pool = new Pool({ connectionString: process.env.DATABASE_URL });
+// const pool = new Pool({ connectionString: process.env.DATABASE_URL });
+// const adapter = new PrismaPg(pool);
+// const prisma = new PrismaClient({ adapter });
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+  ssl: { rejectUnauthorized: false },
+});
 const adapter = new PrismaPg(pool);
 const prisma = new PrismaClient({ adapter });
 
@@ -159,7 +165,6 @@ async function main() {
         full_name: NAMES[i],
         phone: `08${randomInt(10, 99)}-${randomInt(1000, 9999)}-${randomInt(1000, 9999)}`,
         email: `${NAMES[i].toLowerCase().replace(/\s/g, ".")}@email.com`,
-        gender: i % 2 === 0 ? "female" : "male",
         birth_date: daysAgo(randomInt(8000, 20000)),
         segment: randomFrom(SEGMENTS),
         service_type: randomFrom(SERVICES),

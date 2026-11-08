@@ -1,4 +1,4 @@
-const Joi = require('joi');
+const Joi = require("joi");
 
 exports.login = {
   body: Joi.object({
@@ -11,8 +11,19 @@ exports.registrasi = {
   body: Joi.object({
     email: Joi.string().email().required(),
     name: Joi.string().max(100).required(),
-    no_tlp: Joi.string().pattern(/^(\+62|62|0)8[0-9]{8,12}$/).allow(null, '')
-          .messages({ 'string.pattern.base': 'Nomor telepon Indonesia tidak valid' }),
-    password: Joi.string().min(6).required()   
-  })
-}
+    no_tlp: Joi.string()
+      .pattern(/^(\+62|62|0)8[0-9]{8,12}$/)
+      .allow(null, "")
+      .messages({
+        "string.pattern.base": "Nomor telepon Indonesia tidak valid",
+      }),
+    password: Joi.string().min(6).required(),
+  }),
+};
+exports.updateUser = {
+  body: Joi.object({
+    name: Joi.string().trim().max(100).required(),
+    email: Joi.string().trim().lowercase().email().required(),
+    role: Joi.string().trim().max(50),
+  }),
+};

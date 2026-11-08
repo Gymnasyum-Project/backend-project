@@ -1,7 +1,6 @@
 const AppError = require("../utils/AppError");
 
 module.exports = (schemas) => (req, res, next) => {
-  console.log("ISI REQ.BODY SAAT MASUK VALIDATE:", req.body);
   req.validate = {};
   for (const part of ["params", "query", "body"]) {
     if (!schemas[part]) continue;

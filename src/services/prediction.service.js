@@ -44,8 +44,7 @@ exports.batchPredict = async () => {
     try {
       results.push(await exports.predictCustomer(c.id));
     } catch (e) {
-      // lewati customer yang gagal, lanjut ke yang lain
-      console.error(`Gagal prediksi customer ${c.id}:`, e.message);
+      //
     }
   }
   return results;

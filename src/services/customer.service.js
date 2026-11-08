@@ -242,16 +242,42 @@ const assertEmailAvailable = async (email, excludedId) => {
   }
 };
 
-exports.create = async (data) => {
-  const email = data.email?.trim().toLowerCase();
-  await assertEmailAvailable(email);
-  prisma.customers.create({
-    data: {
-      ...data,
-      ...(email && { email }),
-      birth_date: toDate(data.birth_date),
-      join_date: toDate(data.join_date),
-    },
+exports.create = async ({ package_id, ...customerData }) => {
+  return prisma.$transaction(async (tx) => {
+    const pkg = await tx.packages.findUnique({ where: { id: package_id } });
+    if (!pkg)
+      throw new AppError(404, "NOT_FOUND", "Master Paket Tidak Ditemukan");
+
+    const customer = await tx.customers.create({
+      data: {
+        full_name: customerData.full_name,
+        phone: customerData.phone,
+        email: customerData.email,
+        birth_date: new Date(customerData.birth_date),
+        segment: customerData.segment,
+        join_date: new Date(customerData.join_date),
+        notes: customerData.notes || null,
+        service_type: pkg.service_type ?? pkg.name.slice(0, 20),
+      },
+    });
+
+    const start = new Date(customerData.join_date);
+    const end = new Date(start);
+    end.setUTCDate(end.getUTCDate() + pkg.duration_days);
+
+    await tx.customer_packages.create({
+      data: {
+        customer_id: customer.id,
+        package_id: pkg.id,
+        start_date: start,
+        end_date: end,
+        total_sessions: pkg.total_sessions,
+        remaining_sessions: pkg.total_sessions,
+        status: "active",
+      },
+    });
+
+    return customer;
   });
 };
 

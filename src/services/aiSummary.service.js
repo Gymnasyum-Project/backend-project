@@ -32,7 +32,6 @@ exports.generate = async (customerId, userId, { regenerate = false } = {}) => {
   };
 
   const result = await llm.generateSummary(payload);
-  console.log("HASIL LLM:", result);
   return prisma.$transaction(async (tx) => {
     if (regenerate) {
       await tx.ai_summaries.updateMany({

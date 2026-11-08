@@ -26,16 +26,14 @@ exports.create = {
         "string.pattern.base": "Nomor telepon Indonesia tidak valid",
       }),
     email: Joi.string().email().allow(null, ""),
-    gender: Joi.string().valid("female", "male").allow(null),
     birth_date: Joi.date().max("now").allow(null),
     segment: Joi.string()
       .valid(...SEGMENTS)
       .required(),
-    service_type: Joi.string()
-      .valid(...SERVICES)
-      .required(),
+    service_type: Joi.string().valid(...SERVICES),
     join_date: Joi.date().default(() => new Date()),
     notes: Joi.string().allow("", null).max(1000),
+    package_id: Joi.number().integer().positive().required(),
   }),
 };
 
@@ -50,7 +48,6 @@ exports.update = {
         "string.pattern.base": "Nomor telepon Indonesia tidak valid",
       }),
     email: Joi.string().email().allow(null, ""),
-    gender: Joi.string().valid("female", "male").allow(null),
     birth_date: Joi.date().max("now").allow(null),
     join_date: Joi.date(),
     segment: Joi.string().valid(...SEGMENTS),
