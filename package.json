@@ -3,7 +3,8 @@
   "version": "1.0.0",
   "main": "index.js",
   "scripts": {
-    "start": "node src/server.js"
+    "start": "node src/server.js",
+    "postinstall": "prisma generate --config prisma7.config.ts"
   },
   "prisma": {
     "seed": "node prisma/seed.js"
