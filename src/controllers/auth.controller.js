@@ -18,7 +18,6 @@ exports.registrasi = async (req, res, next) => {
 };
 
 exports.updateUser = async (req, res, next) => {
-  console.log(req.validate.body);
   try {
     const id = req.user.id;
     const { name, email, role } = req.validate.body;
