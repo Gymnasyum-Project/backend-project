@@ -7,15 +7,15 @@ import "dotenv/config";
 import bcrypt from "bcrypt";
 
 // Inisialisasi Prisma v7 dengan Driver Adapter
-// const pool = new Pool({ connectionString: process.env.DATABASE_URL });
-// const adapter = new PrismaPg(pool);
-// const prisma = new PrismaClient({ adapter });
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-  ssl: { rejectUnauthorized: false },
-});
+const pool = new Pool({ connectionString: process.env.DATABASE_URL });
 const adapter = new PrismaPg(pool);
 const prisma = new PrismaClient({ adapter });
+// const pool = new Pool({
+//   connectionString: process.env.DATABASE_URL,
+//   ssl: { rejectUnauthorized: false },
+// });
+// const adapter = new PrismaPg(pool);
+// const prisma = new PrismaClient({ adapter });
 
 const SEGMENTS = ["ibu_ibu", "lansia", "menengah_atas", "lainnya"];
 const SERVICES = ["gym", "private_coaching"];

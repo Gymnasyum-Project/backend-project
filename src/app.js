@@ -10,7 +10,7 @@ const { notFound, errorHandler } = require("./middlewares/errorHandler");
 const app = express();
 app.set("trust proxy", 1);
 app.use(helmet());
-// app.use(cors({ origin: env.CORS_ORIGIN }));
+
 const allowedOrigins = String(env.CORS_ORIGIN || "")
   .split(",")
   .map((o) => o.trim())
@@ -27,8 +27,9 @@ app.use(
       if (env.NODE_ENV !== "production" && isLocalOrigin(origin)) {
         return callback(null, true);
       }
-      callback(null, false);
+      callback(new Error("Not allowed by CORS"));
     },
+    credentials: true,
   }),
 );
 
