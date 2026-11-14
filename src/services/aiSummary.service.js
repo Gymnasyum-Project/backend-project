@@ -73,3 +73,20 @@ exports.updateSummary = async (id, { edited_draft, status }) => {
     },
   });
 };
+
+exports.getDraftFollowUp = async (customerId) => {
+  const getDfrat = await prisma.ai_summaries.findFirst({
+    where: {
+      customer_id: Number(customerId),
+      followup_draft: { not: null },
+    },
+    orderBy: { created_at: "desc" },
+    select: {
+      id: true,
+      customer_id: true,
+      followup_draft: true,
+      created_at: true,
+    },
+  });
+  return getDfrat;
+};

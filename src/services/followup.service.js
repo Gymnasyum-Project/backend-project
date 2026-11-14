@@ -16,19 +16,19 @@ exports.create = (data, userId) =>
 // BARU: untuk halaman Prioritas Follow-up
 exports.getPriorityList = async () => {
   const rows = await prisma.$queryRaw`
-    SELECT 
-      c.id, 
-      c.full_name, 
-      c.segment, 
+    SELECT
+      c.id,
+      c.full_name,
+      c.segment,
       c.phone,
-      rp.label, 
+      rp.label,
       rp.priority_score,
       cp.remaining_sessions,
       (
-        SELECT MAX(scheduled_at)::date 
-        FROM attendance 
+        SELECT MAX(scheduled_at)::date
+        FROM attendance
         WHERE customer_id = c.id AND status = 'attended'
-      ) as last_visit
+      ) AS last_visit
     FROM customers c
     INNER JOIN LATERAL (
       SELECT label, priority_score
@@ -37,18 +37,28 @@ exports.getPriorityList = async () => {
       ORDER BY predicted_at DESC
       LIMIT 1
     ) rp ON true
-    LEFT JOIN customer_packages cp 
-      ON cp.customer_id = c.id AND cp.status = 'active'
-    WHERE rp.label IN ('At Risk', 'Need Attention')
-    ORDER BY 
+    LEFT JOIN LATERAL (
+      SELECT remaining_sessions
+      FROM customer_packages
+      WHERE customer_id = c.id AND status = 'active'
+      ORDER BY start_date DESC
+      LIMIT 1
+    ) cp ON true
+    WHERE c.deleted_at IS NULL
+      AND rp.label IN ('At Risk', 'Need Attention')
+    ORDER BY
       CASE rp.label WHEN 'At Risk' THEN 1 WHEN 'Need Attention' THEN 2 END,
-      rp.priority_score DESC
+      rp.priority_score DESC NULLS LAST,
+      c.id ASC
   `;
 
+  const atRisk = rows.filter((r) => r.label === "At Risk");
+  const needAttention = rows.filter((r) => r.label === "Need Attention");
+
   return {
-    at_risk: rows.filter((r) => r.label === 'At Risk'),
-    need_attention: rows.filter((r) => r.label === 'Need Attention'),
-    total_at_risk: rows.filter((r) => r.label === 'At Risk').length,
-    total_need_attention: rows.filter((r) => r.label === 'Need Attention').length,
+    at_risk: atRisk,
+    need_attention: needAttention,
+    total_at_risk: atRisk.length,
+    total_need_attention: needAttention.length,
   };
 };
