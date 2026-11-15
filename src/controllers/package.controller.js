@@ -1,16 +1,16 @@
 const service = require("../services/package.service");
 const { ok, created } = require("../utils/response");
-const svc = require("../services/package.service");
 
 exports.list = async (req, res) => {
-  const data = await svc.list(req.query.status);
+  const data = await service.list(req.query.status);
   ok(res, data);
 };
 
 exports.createPackage = async (req, res) =>
   created(res, await service.createPackage(req.validate.body));
 exports.update = async (req, res) => {
-  const data = await svc.update(req.validate.params.id, req.validate.body);
+  const data = await service.update(req.validate.params.id, req.validate.body);
+
   res.json({ success: true, data });
 };
 exports.listCustomerPackages = async (req, res) =>

@@ -10,6 +10,7 @@ exports.list = (status) =>
   });
 
 exports.createPackage = (data) => prisma.packages.create({ data });
+
 exports.update = async (id, data) => {
   const exists = await prisma.packages.findUnique({
     where: { id: Number(id) },
@@ -17,6 +18,7 @@ exports.update = async (id, data) => {
   if (!exists) throw new AppError(404, "NOT_FOUND", "Paket tidak ditemukan");
   return prisma.packages.update({ where: { id: Number(id) }, data });
 };
+
 exports.assignToCustomer = async ({ customer_id, package_id, start_date }) => {
   const start = new Date(start_date);
   if (Number.isNaN(start.getTime())) {
