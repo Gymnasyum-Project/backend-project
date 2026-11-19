@@ -1,5 +1,6 @@
 const AppError = require("../utils/AppError");
 const prisma = require("../config/prisma");
+const { Prisma } = require("@prisma/client");
 const { custom } = require("joi");
 
 const RISK_LABEL_MAP = {
@@ -72,148 +73,132 @@ const buildStats = async (customerId) => {
 
 exports.list = async ({ page, limit, search, risk, segment, sort } = {}) => {
   const pageNum = Math.max(parseInt(page, 10) || 1, 1);
-  const limitNum = Math.min(Math.max(parseInt(limit, 10) || 10, 1), 100);
+  const limitNum = Math.min(Math.max(parseInt(limit, 10) || 20, 1), 100);
   const skip = (pageNum - 1) * limitNum;
   const since = new Date(Date.now() - THIRTY_DAYS_MS);
+  const searchTerm = search?.trim() || null;
 
-  if (risk || sort === "priority") {
-    const riskLabel = risk ? RISK_LABEL_MAP[risk] : null;
-    if (risk && !riskLabel) {
-      throw new AppError(400, "Bad Request", "Nilai risk tidak valid");
-    }
-
-    const [rows, countRows] = await Promise.all([
-      prisma.$queryRaw`
-                SELECT c.*,
-                    rp.label AS risk_label,
-                    rp.priority_score,
-                    cp.remaining_sessions,
-                    cp.end_date AS package_end_date,
-                    (SELECT COUNT(*)::int FROM attendance a
-                        WHERE a.customer_id = c.id
-                        AND a.status = 'attended'
-                        AND a.scheduled_at >= ${since}) AS attendance_30d,
-                    (SELECT MAX(a.scheduled_at) FROM attendance a
-                        WHERE a.customer_id = c.id
-                        AND a.status = 'attended') AS last_visit
-                FROM customers c
-                LEFT JOIN LATERAL (
-                    SELECT label, priority_score
-                    FROM risk_predictions
-                    WHERE customer_id = c.id
-                    ORDER BY predicted_at DESC
-                    LIMIT 1
-                ) rp ON true
-                LEFT JOIN LATERAL (
-                    SELECT remaining_sessions, end_date
-                    FROM customer_packages
-                    WHERE customer_id = c.id AND status = 'active'
-                    ORDER BY start_date DESC
-                    LIMIT 1
-                ) cp ON true
-                WHERE c.deleted_at IS NULL
-                AND (${riskLabel}::text IS NULL OR rp.label = ${riskLabel}::text)
-                AND (${search ?? null}::text IS NULL OR c.full_name ILIKE '%' || ${search ?? null}::text || '%')
-                AND (${segment ?? null}::text IS NULL OR c.segment = ${segment ?? null}::text)
-                ORDER BY rp.priority_score DESC NULLS LAST, c.id ASC
-                LIMIT ${limitNum} OFFSET ${skip}
-            `,
-      // total data dengan filter yang sama, tanpa LIMIT/OFFSET
-      prisma.$queryRaw`
-                SELECT COUNT(*)::int AS total
-                FROM customers c
-                LEFT JOIN LATERAL (
-                    SELECT label
-                    FROM risk_predictions
-                    WHERE customer_id = c.id
-                    ORDER BY predicted_at DESC
-                    LIMIT 1
-                ) rp ON true
-                WHERE c.deleted_at IS NULL
-                AND (${riskLabel}::text IS NULL OR rp.label = ${riskLabel}::text)
-                AND (${search ?? null}::text IS NULL OR c.full_name ILIKE '%' || ${search ?? null}::text || '%')
-                AND (${segment ?? null}::text IS NULL OR c.segment = ${segment ?? null}::text)
-            `,
-    ]);
-
-    const total = countRows[0].total;
-    return {
-      items: rows,
-      meta: {
-        page: pageNum,
-        limit: limitNum,
-        total,
-        totalPages: Math.ceil(total / limitNum),
-      },
-    };
+  const riskLabel = risk ? RISK_LABEL_MAP[risk] : null;
+  if (risk && !riskLabel) {
+    throw new AppError(400, "Bad Request", "Nilai risk tidak valid");
   }
 
-  const where = {
-    deleted_at: null,
-    ...(search && { full_name: { contains: search, mode: "insensitive" } }),
-    ...(segment && { segment }),
+  // Tentukan urutan berdasarkan parameter sort
+  const orderByClause =
+    sort === "name"
+      ? Prisma.sql`c.full_name ASC, c.id ASC`
+      : sort === "join_date"
+        ? Prisma.sql`c.join_date DESC NULLS LAST, c.id ASC`
+        : Prisma.sql`rp.priority_score DESC NULLS LAST, c.id ASC`;
+
+  const [rows, countRows, tabCountRows] = await Promise.all([
+    // 1. Ambil 20 data sesuai tab, filter segment, search, dan urutan
+    prisma.$queryRaw`
+      SELECT c.*,
+          rp.label AS risk_label,
+          rp.priority_score,
+          cp.remaining_sessions,
+          cp.end_date AS package_end_date,
+          (SELECT COUNT(*)::int FROM attendance a
+              WHERE a.customer_id = c.id
+              AND a.status = 'attended'
+              AND a.scheduled_at >= ${since}) AS attendance_30d,
+          (SELECT MAX(a.scheduled_at) FROM attendance a
+              WHERE a.customer_id = c.id
+              AND a.status = 'attended') AS last_visit
+      FROM customers c
+      LEFT JOIN LATERAL (
+          SELECT label, priority_score
+          FROM risk_predictions
+          WHERE customer_id = c.id
+          ORDER BY predicted_at DESC
+          LIMIT 1
+      ) rp ON true
+      LEFT JOIN LATERAL (
+          SELECT remaining_sessions, end_date
+          FROM customer_packages
+          WHERE customer_id = c.id AND status = 'active'
+          ORDER BY start_date DESC
+          LIMIT 1
+      ) cp ON true
+      WHERE c.deleted_at IS NULL
+      AND (${riskLabel}::text IS NULL OR rp.label = ${riskLabel}::text)
+      AND (${segment ?? null}::text IS NULL OR c.segment = ${segment ?? null}::text)
+      AND (
+        ${searchTerm}::text IS NULL
+        OR c.full_name ILIKE '%' || ${searchTerm}::text || '%'
+        OR c.phone ILIKE '%' || ${searchTerm}::text || '%'
+        OR c.email ILIKE '%' || ${searchTerm}::text || '%'
+        OR ('CUST' || LPAD(c.id::text, 5, '0')) ILIKE '%' || ${searchTerm}::text || '%'
+      )
+      ORDER BY ${orderByClause}
+      LIMIT ${limitNum} OFFSET ${skip}
+    `,
+
+    // 2. Total baris sesuai filter aktif (untuk menghitung sisa data pada tombol Load More)
+    prisma.$queryRaw`
+      SELECT COUNT(*)::int AS total
+      FROM customers c
+      LEFT JOIN LATERAL (
+          SELECT label
+          FROM risk_predictions
+          WHERE customer_id = c.id
+          ORDER BY predicted_at DESC
+          LIMIT 1
+      ) rp ON true
+      WHERE c.deleted_at IS NULL
+      AND (${riskLabel}::text IS NULL OR rp.label = ${riskLabel}::text)
+      AND (${segment ?? null}::text IS NULL OR c.segment = ${segment ?? null}::text)
+      AND (
+        ${searchTerm}::text IS NULL
+        OR c.full_name ILIKE '%' || ${searchTerm}::text || '%'
+        OR c.phone ILIKE '%' || ${searchTerm}::text || '%'
+        OR c.email ILIKE '%' || ${searchTerm}::text || '%'
+        OR ('CUST' || LPAD(c.id::text, 5, '0')) ILIKE '%' || ${searchTerm}::text || '%'
+      )
+    `,
+
+    // 3. Hitung jumlah customer per kategori risiko untuk angka di masing-masing Tab
+    prisma.$queryRaw`
+      SELECT rp.label, COUNT(*)::int AS total
+      FROM customers c
+      LEFT JOIN LATERAL (
+          SELECT label
+          FROM risk_predictions
+          WHERE customer_id = c.id
+          ORDER BY predicted_at DESC
+          LIMIT 1
+      ) rp ON true
+      WHERE c.deleted_at IS NULL
+      GROUP BY rp.label
+    `,
+  ]);
+
+  const counts = {
+    all: 0,
+    at_risk: 0,
+    need_attention: 0,
+    active: 0,
   };
 
-  const [customers, total] = await Promise.all([
-    prisma.customers.findMany({
-      where,
-      skip,
-      take: limitNum,
-      orderBy: { full_name: "asc" },
-    }),
-    prisma.customers.count({ where }),
-  ]);
-
-  const ids = customers.map((c) => c.id);
-
-  const [counts, packages, lastVisits] = await Promise.all([
-    prisma.attendance.groupBy({
-      by: ["customer_id"],
-      where: {
-        customer_id: { in: ids },
-        status: "attended",
-        scheduled_at: { gte: since },
-      },
-      _count: { _all: true },
-    }),
-    prisma.customer_packages.findMany({
-      where: { customer_id: { in: ids }, status: "active" },
-      orderBy: { start_date: "desc" },
-      select: { customer_id: true, remaining_sessions: true, end_date: true },
-    }),
-    prisma.attendance.groupBy({
-      by: ["customer_id"],
-      where: { customer_id: { in: ids }, status: "attended" },
-      _max: { scheduled_at: true },
-    }),
-  ]);
-
-  const countMap = new Map(counts.map((r) => [r.customer_id, r._count._all]));
-  const lastVisitMap = new Map(
-    lastVisits.map((r) => [r.customer_id, r._max.scheduled_at]),
-  );
-
-  // hasil sudah urut start_date terbaru, jadi yang pertama muncul per customer = paket terbaru
-  const packageMap = new Map();
-  for (const p of packages) {
-    if (!packageMap.has(p.customer_id)) packageMap.set(p.customer_id, p);
+  for (const row of tabCountRows) {
+    counts.all += row.total;
+    if (row.label === "At Risk") counts.at_risk = row.total;
+    else if (row.label === "Need Attention") counts.need_attention = row.total;
+    else if (row.label === "Active") counts.active = row.total;
   }
 
-  const items = customers.map((c) => ({
-    ...c,
-    attendance_30d: countMap.get(c.id) ?? 0,
-    last_visit: lastVisitMap.get(c.id) ?? null,
-    remaining_sessions: packageMap.get(c.id)?.remaining_sessions ?? null,
-    package_end_date: packageMap.get(c.id)?.end_date ?? null,
-  }));
+  const total = countRows[0].total;
 
   return {
-    items,
+    items: rows,
     meta: {
       page: pageNum,
       limit: limitNum,
       total,
       totalPages: Math.ceil(total / limitNum),
+      hasMore: skip + rows.length < total,
+      counts,
     },
   };
 };
@@ -248,22 +233,8 @@ exports.create = async ({ package_id, ...customerData }) => {
     if (!pkg)
       throw new AppError(404, "NOT_FOUND", "Master Paket Tidak Ditemukan");
 
-    const lastCustomer = await tx.customers.findFirst({
-      where: { id: { startsWith: "CUST" } },
-      orderBy: { id: "desc" },
-      select: { id: true },
-    });
-    let nextNumber = 1;
-    if (lastCustomer && lastCustomer.id.startsWith("CUST")) {
-      const lastNumber = parseInt(lastCustomer.id.replace("CUST", ""), 10);
-      if (!isNaN(lastNumber)) {
-        nextNumber = lastNumber + 1;
-      }
-    }
-    const customId = `CUST${String(nextNumber).padStart(5, "0")}`;
     const customer = await tx.customers.create({
       data: {
-        id: customId,
         full_name: customerData.full_name,
         phone: customerData.phone,
         email: customerData.email,
@@ -294,7 +265,6 @@ exports.create = async ({ package_id, ...customerData }) => {
     return customer;
   });
 };
-
 exports.getDetail = async (id) => {
   const thirtyDaysAgo = new Date(Date.now() - THIRTY_DAYS_MS);
   const customer = await prisma.customers.findFirst({

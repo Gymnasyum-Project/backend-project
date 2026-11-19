@@ -2,23 +2,16 @@ const Joi = require("joi");
 const { idParam } = require("./common.validator");
 
 const STATUS = ["attended", "missed", "rescheduled"];
-const customerIdRule = Joi.string()
-  .trim()
-  .pattern(/^CUST\d{5}$/)
-  .required()
-  .messages({
-    "string.pattern.base": "Format customer_id harus seperti CUST00001",
-  });
 
 exports.list = {
   query: Joi.object({
-    customer_id: customerIdRule,
+    customer_id: Joi.number().integer().positive().required(),
   }),
 };
 
 exports.create = {
   body: Joi.object({
-    customer_id: customerIdRule,
+    customer_id: Joi.number().integer().positive().required(),
     customer_package_id: Joi.number().integer().positive().required(),
     scheduled_at: Joi.date().required(),
     status: Joi.string()
@@ -42,14 +35,12 @@ exports.update = {
 exports.reschedule = {
   params: idParam,
   body: Joi.object({
-    visited_at: Joi.date().iso().max("now").required(),
-    coach_name: Joi.string().max(100).allow("", null),
-    reason: Joi.string().max(255).allow("", null),
+    new_schedule: Joi.date().required(),
+    reason: Joi.string().max(500).allow("", null),
   }),
 };
-
 exports.pendingReschedules = {
   query: Joi.object({
-    customer_id: customerIdRule,
+    customer_id: Joi.number().integer().positive().optional(),
   }),
 };

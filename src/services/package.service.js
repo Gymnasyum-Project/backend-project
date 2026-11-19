@@ -64,7 +64,7 @@ exports.assignToCustomer = async ({ customer_id, package_id, start_date }) => {
 };
 exports.getCustomerPackage = async (customerId) => {
   const result = await prisma.customer_packages.findMany({
-    where: { customer_id: customerId },
+    where: { customer_id: Number(customerId) },
     include: {
       packages: true,
       customers: {

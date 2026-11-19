@@ -86,11 +86,9 @@ exports.updateStatus = async (id, { status, checkin_at }) => {
   });
 };
 
-exports.reschedules = async (
-  attendanceId,
-  { visited_at, coach_name, reason },
-) =>
+exports.reschedules = async (id, { visited_at, coach_name, reason }) =>
   prisma.$transaction(async (tx) => {
+    const attendanceId = Number(id);
     const original = await tx.attendance.findUnique({
       where: { id: attendanceId },
     });
