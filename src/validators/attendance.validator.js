@@ -1,7 +1,7 @@
 const Joi = require("joi");
 const { idParam } = require("./common.validator");
 
-const STATUS = ["attended", "missed", "rescheduled", "cancelled"];
+const STATUS = ["attended", "missed", "rescheduled"];
 
 exports.list = {
   query: Joi.object({
@@ -39,4 +39,8 @@ exports.reschedule = {
     reason: Joi.string().max(500).allow("", null),
   }),
 };
-
+exports.pendingReschedules = {
+  query: Joi.object({
+    customer_id: Joi.number().integer().positive().optional(),
+  }),
+};

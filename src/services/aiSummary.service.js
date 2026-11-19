@@ -2,12 +2,17 @@ const prisma = require("../config/prisma");
 const llm = require("../integrations/llm.client");
 const AppError = require("../utils/AppError");
 
-exports.generate = async (customerId, userId, { regenerate = false } = {}) => {
+const generateInternal = async (
+  customerId,
+  userId,
+  { regenerate = false } = {},
+) => {
   const prediction = await prisma.risk_predictions.findFirst({
     where: { customer_id: customerId },
     orderBy: { predicted_at: "desc" },
     include: { customers: true },
   });
+
   if (!prediction)
     throw new AppError(
       409,
@@ -24,14 +29,22 @@ exports.generate = async (customerId, userId, { regenerate = false } = {}) => {
   }
 
   const payload = {
+    customer_id: customerId, // hanya identitas, tidak dipakai sebagai indikator
     nama_panggilan: prediction.customers.full_name,
     segmen: prediction.customers.segment,
     risk_label: prediction.label,
-    top_factors: prediction.top_factors,
-    ringkasan_angka: prediction.features,
+    top_factors: prediction.top_factors ?? [],
+    ringkasan_angka: prediction.features ?? {},
   };
-
   const result = await llm.generateSummary(payload);
+  if (!result?.summary) {
+    throw new AppError(
+      502,
+      "LLM_EMPTY_RESPONSE",
+      "Layanan AI tidak mengembalikan ringkasan",
+    );
+  }
+
   return prisma.$transaction(async (tx) => {
     if (regenerate) {
       await tx.ai_summaries.updateMany({
@@ -44,7 +57,7 @@ exports.generate = async (customerId, userId, { regenerate = false } = {}) => {
         customer_id: customerId,
         prediction_id: prediction.id,
         summary: result.summary,
-        followup_draft: result.draft_whatsapp,
+        followup_draft: result.draft_whatsapp ?? null,
         llm_model: result.model_used ?? "unknown",
         prompt_version: result.prompt_version ?? "v1",
         status: "draft",
@@ -54,6 +67,18 @@ exports.generate = async (customerId, userId, { regenerate = false } = {}) => {
   });
 };
 
+const inFlight = new Map();
+
+exports.generate = (customerId, userId, opts = {}) => {
+  const key = `${customerId}:${opts.regenerate ? "regen" : "normal"}`;
+  if (inFlight.has(key)) return inFlight.get(key);
+
+  const promise = generateInternal(customerId, userId, opts).finally(() =>
+    inFlight.delete(key),
+  );
+  inFlight.set(key, promise);
+  return promise;
+};
 const ALLOWED_STATUS = ["draft", "approved", "discarded"];
 
 exports.updateSummary = async (id, { edited_draft, status }) => {
@@ -75,18 +100,24 @@ exports.updateSummary = async (id, { edited_draft, status }) => {
 };
 
 exports.getDraftFollowUp = async (customerId) => {
-  const getDfrat = await prisma.ai_summaries.findFirst({
+  const row = await prisma.ai_summaries.findFirst({
     where: {
       customer_id: Number(customerId),
-      followup_draft: { not: null },
+      status: { not: "discarded" },
+      OR: [{ followup_draft: { not: null } }, { edited_draft: { not: null } }],
     },
     orderBy: { created_at: "desc" },
     select: {
       id: true,
       customer_id: true,
+      status: true,
       followup_draft: true,
+      edited_draft: true,
       created_at: true,
     },
   });
-  return getDfrat;
+  if (!row) return null;
+
+  const { edited_draft, ...rest } = row;
+  return { ...rest, followup_draft: edited_draft ?? row.followup_draft };
 };

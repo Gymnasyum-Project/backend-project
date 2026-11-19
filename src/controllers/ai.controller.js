@@ -1,19 +1,6 @@
 const aiSummaryService = require("../services/aiSummary.service");
 const { ok, created } = require("../utils/response");
-
-exports.generate = async (req, res, next) => {
-  try {
-    const { customerId } = req.validate.params;
-    const { regenerate } = req.validate.body;
-
-    const summary = await aiSummaryService.generate(customerId, req.user.id, {
-      regenerate,
-    });
-    created(res, summary);
-  } catch (err) {
-    next(err);
-  }
-};
+const AppError = require("../utils/AppError");
 
 exports.update = async (req, res, next) => {
   try {
@@ -25,16 +12,27 @@ exports.update = async (req, res, next) => {
   }
 };
 
+exports.generate = async (req, res, next) => {
+  try {
+    const { customerId } = req.validate.params;
+    const { regenerate = false } = req.validate.body ?? {};
+    const summary = await aiSummaryService.generate(customerId, req.user.id, {
+      regenerate,
+    });
+    created(res, summary);
+  } catch (err) {
+    next(err);
+  }
+};
+
 exports.getDraftFollowUp = async (req, res, next) => {
   try {
-    const draft = await aiSummaryService.getDraftFollowUp(req.params.id);
-    if (!draft) {
-      return res
-        .status(404)
-        .json({ message: "Draft follow-up belum tersedia" });
-    }
-    res.json({ data: draft });
+    const { customerId } = req.validate.params;
+    const draft = await aiSummaryService.getDraftFollowUp(customerId);
+    if (!draft)
+      throw new AppError(404, "NOT_FOUND", "Draft follow-up belum tersedia");
+    ok(res, draft);
   } catch (err) {
-    res.status(500).json({ message: err.message });
+    next(err);
   }
 };

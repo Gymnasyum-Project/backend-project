@@ -28,3 +28,5 @@ exports.updateStatus = async (req, res) =>
 exports.reschedule = async (req, res) => {
   ok(res, await service.reschedules(req.validate.params.id, req.validate.body));
 };
+exports.pendingReschedules = async (req, res) =>
+  ok(res, await service.listPendingReschedules(req.validate.query.customer_id));

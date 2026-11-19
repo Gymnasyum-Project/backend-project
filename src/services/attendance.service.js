@@ -42,8 +42,7 @@ exports.create = (data) =>
         coach_name: data.coach_name,
         status: data.status,
         scheduled_at: data.scheduled_at,
-        checkin_at: data.checkin_at,
-        // Hubungkan relasi customers dan customer_packages menggunakan connect
+        checkin_at: data.status === "attended" ? data.checkin_at : null,
         customers: {
           connect: { id: data.customer_id },
         },
@@ -87,33 +86,89 @@ exports.updateStatus = async (id, { status, checkin_at }) => {
   });
 };
 
-exports.reschedules = async (attendanceId, { new_schedule, reason }) => {
-  const attendance = await prisma.attendance.findUnique({
-    where: { id: attendanceId },
-  });
-  if (!attendance)
-    throw new AppError(404, "NOT_FOUND", "Jadwal attendance tidak ditemukan");
+exports.reschedules = async (id, { visited_at, coach_name, reason }) =>
+  prisma.$transaction(async (tx) => {
+    const attendanceId = Number(id);
+    const original = await tx.attendance.findUnique({
+      where: { id: attendanceId },
+    });
+    if (!original)
+      throw new AppError(404, "NOT_FOUND", "Jadwal attendance tidak ditemukan");
+    if (original.status !== "rescheduled")
+      throw new AppError(
+        409,
+        "NOT_RESCHEDULED",
+        "Sesi ini tidak berstatus dijadwal ulang",
+      );
 
-  return prisma.$transaction(async (tx) => {
+    const fulfilled = await tx.reschedules.findFirst({
+      where: { attendance_id: attendanceId },
+      select: { id: true },
+    });
+    if (fulfilled)
+      throw new AppError(
+        409,
+        "ALREADY_ATTENDED",
+        "Kedatangan untuk sesi ini sudah dicatat",
+      );
+
+    const pkg = await tx.customer_packages.findUnique({
+      where: { id: original.customer_package_id },
+      select: { status: true, remaining_sessions: true },
+    });
+    if (!pkg || pkg.status !== "active")
+      throw new AppError(409, "PACKAGE_NOT_ACTIVE", "Paket sudah tidak aktif");
+    if (pkg.remaining_sessions <= 0)
+      throw new AppError(
+        409,
+        "NO_REMAINING_SESSIONS",
+        "Sisa paket sudah habis",
+      );
+
+    const visit = await tx.attendance.create({
+      data: {
+        status: "attended",
+        scheduled_at: visited_at,
+        checkin_at: visited_at,
+        coach_name: coach_name || original.coach_name,
+        customers: { connect: { id: original.customer_id } },
+        customer_packages: { connect: { id: original.customer_package_id } },
+      },
+    });
+
     await tx.reschedules.create({
       data: {
         attendance_id: attendanceId,
-        old_schedule: attendance.scheduled_at,
-        new_schedule,
+        old_schedule: original.scheduled_at,
+        new_schedule: visited_at,
         reason,
         requested_at: new Date(),
       },
     });
 
-    // sesi yang dijadwal ulang tidak lagi dianggap terpakai
-    if (consumesSession(attendance.status)) {
-      await changeSessions(tx, attendance.customer_package_id, +1);
-    }
+    await changeSessions(tx, original.customer_package_id, -1);
 
-    return tx.attendance.update({
-      where: { id: attendanceId },
-      data: { status: "rescheduled", scheduled_at: new_schedule },
-    });
+    return visit;
+  });
+
+exports.listPendingReschedules = async (customerId) => {
+  const done = await prisma.reschedules.findMany({
+    where: { attendance: { customer_id: customerId } },
+    select: { attendance_id: true },
+  });
+
+  return prisma.attendance.findMany({
+    where: {
+      customer_id: customerId,
+      status: "rescheduled",
+      id: { notIn: done.map((r) => r.attendance_id).filter(Boolean) },
+    },
+    orderBy: { scheduled_at: "desc" },
+    include: {
+      customer_packages: {
+        select: { packages: { select: { name: true, service_type: true } } },
+      },
+    },
   });
 };
 
