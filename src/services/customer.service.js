@@ -21,6 +21,7 @@ const toDate = (value) => {
 };
 const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000;
 const DAY_MS = 24 * 60 * 60 * 1000;
+const SEVEN_DAYS_MS = 7 * DAY_MS;
 const countOf = (rows, key, value) =>
   rows.find((r) => r[key] === value)?._count._all ?? 0;
 
@@ -37,7 +38,7 @@ const buildStats = async (customerId) => {
       prisma.attendance.findFirst({
         where: { customer_id: customerId, status: "attended" },
         orderBy: { scheduled_at: "desc" },
-        select: { scheduled_at: true },
+        select: { scheduled_at: true, checkin_at: true },
       }),
       prisma.customer_packages.findFirst({
         where: { customer_id: customerId, status: "active" },
@@ -50,23 +51,22 @@ const buildStats = async (customerId) => {
         _count: { _all: true },
       }),
     ]);
-
   const attended = countOf(attendanceRows, "status", "attended");
   const missed = countOf(attendanceRows, "status", "missed");
+  const lastVisitAt = lastVisit?.checkin_at ?? lastVisit?.scheduled_at ?? null;
   const rescheduled = countOf(attendanceRows, "status", "rescheduled");
-
   return {
-    attendance_30d: attended, // Frekuensi Hadir (30 hr)
-    missed_30d: missed, // Sesi Terlewat
-    total_sessions_30d: attended + missed, // "dari 8 sesi"
-    reschedule_30d: rescheduled, // Reschedule
-    remaining_sessions: activePackage?.remaining_sessions ?? null, // Sisa Paket
-    last_visit: lastVisit?.scheduled_at ?? null,
-    days_since_last_visit: lastVisit // Hari Sejak Kunjungan
-      ? Math.floor((Date.now() - new Date(lastVisit.scheduled_at)) / DAY_MS)
+    attendance_7d: attended,
+    missed_7d: missed,
+    total_sessions_7d: attended + missed,
+    reschedule_7d: rescheduled,
+    remaining_sessions: activePackage?.remaining_sessions ?? null,
+    last_visit: lastVisitAt,
+    days_since_last_visit: lastVisitAt
+      ? Math.floor((Date.now() - new Date(lastVisitAt)) / DAY_MS)
       : null,
-    reminder_total_30d: reminderRows.reduce((sum, r) => sum + r._count._all, 0), // penyebut "1/3"
-    reminder_responded_30d: countOf(reminderRows, "response_status", "replied"), // pembilang "1/3"
+    reminder_total_7d: reminderRows.reduce((sum, r) => sum + r._count._all, 0),
+    reminder_responded_7d: countOf(reminderRows, "response_status", "replied"),
   };
 };
 
@@ -248,8 +248,22 @@ exports.create = async ({ package_id, ...customerData }) => {
     if (!pkg)
       throw new AppError(404, "NOT_FOUND", "Master Paket Tidak Ditemukan");
 
+    const lastCustomer = await tx.customers.findFirst({
+      where: { id: { startsWith: "CUST" } },
+      orderBy: { id: "desc" },
+      select: { id: true },
+    });
+    let nextNumber = 1;
+    if (lastCustomer && lastCustomer.id.startsWith("CUST")) {
+      const lastNumber = parseInt(lastCustomer.id.replace("CUST", ""), 10);
+      if (!isNaN(lastNumber)) {
+        nextNumber = lastNumber + 1;
+      }
+    }
+    const customId = `CUST${String(nextNumber).padStart(5, "0")}`;
     const customer = await tx.customers.create({
       data: {
+        id: customId,
         full_name: customerData.full_name,
         phone: customerData.phone,
         email: customerData.email,
@@ -282,6 +296,7 @@ exports.create = async ({ package_id, ...customerData }) => {
 };
 
 exports.getDetail = async (id) => {
+  const thirtyDaysAgo = new Date(Date.now() - THIRTY_DAYS_MS);
   const customer = await prisma.customers.findFirst({
     where: {
       id: Number(id),
@@ -291,6 +306,16 @@ exports.getDetail = async (id) => {
       customer_packages: { include: { packages: true } },
       attendance: { orderBy: { scheduled_at: "desc" }, take: 20 },
       risk_predictions: { orderBy: { predicted_at: "desc" }, take: 1 },
+      reminders: {
+        where: {
+          sent_at: {
+            gte: thirtyDaysAgo,
+          },
+        },
+        orderBy: {
+          sent_at: "desc",
+        },
+      },
     },
   });
 
@@ -326,7 +351,6 @@ exports.getDetail = async (id) => {
     where: { customer_id: customer.id },
     orderBy: { created_at: "desc" },
   });
-
   return { ...customer, reschedules, ai_summary, stats };
 };
 

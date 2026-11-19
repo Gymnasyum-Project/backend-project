@@ -10,16 +10,113 @@ import bcrypt from "bcrypt";
 const pool = new Pool({ connectionString: process.env.DATABASE_URL });
 const adapter = new PrismaPg(pool);
 const prisma = new PrismaClient({ adapter });
-// const pool = new Pool({
-//   connectionString: process.env.DATABASE_URL,
-//   ssl: { rejectUnauthorized: false },
-// });
-// const adapter = new PrismaPg(pool);
-// const prisma = new PrismaClient({ adapter });
 
+const TOTAL_CUSTOMERS = 2000;
 const SEGMENTS = ["ibu_ibu", "lansia", "menengah_atas", "lainnya"];
 const SERVICES = ["gym", "private_coaching"];
-const COACHES = ["Coach Rina", "Coach Budi", "Coach Dewi"];
+const COACHES = [
+  "Coach Rina",
+  "Coach Budi",
+  "Coach Dewi",
+  "Coach Andi",
+  "Coach Maya",
+];
+
+const FIRST_NAMES = [
+  "Sari",
+  "Hendra",
+  "Rina",
+  "Agus",
+  "Melati",
+  "Laras",
+  "Doni",
+  "Fitri",
+  "Rudi",
+  "Nadia",
+  "Irwan",
+  "Citra",
+  "Budi",
+  "Yuni",
+  "Eko",
+  "Wati",
+  "Hadi",
+  "Dewi",
+  "Joko",
+  "Ani",
+  "Bambang",
+  "Siti",
+  "Tono",
+  "Ratna",
+  "Dedi",
+  "Indah",
+  "Slamet",
+  "Yanti",
+  "Rizky",
+  "Lina",
+  "Dimas",
+  "Putri",
+  "Fajar",
+  "Ayu",
+  "Bayu",
+  "Nisa",
+  "Arif",
+  "Maya",
+  "Wahyu",
+  "Dian",
+  "Bagus",
+  "Tari",
+  "Andi",
+  "Mega",
+  "Reza",
+  "Intan",
+  "Ilham",
+  "Vina",
+  "Galih",
+  "Wulan",
+];
+
+const LAST_NAMES = [
+  "Dewi",
+  "Wijaya",
+  "Susanti",
+  "Santoso",
+  "Putri",
+  "Wulandari",
+  "Prasetyo",
+  "Handayani",
+  "Hartono",
+  "Permata",
+  "Kusuma",
+  "Lestari",
+  "Setiawan",
+  "Astuti",
+  "Prabowo",
+  "Suryani",
+  "Nugroho",
+  "Kurniawati",
+  "Susilo",
+  "Rahayu",
+  "Hermawan",
+  "Aminah",
+  "Sari",
+  "Kurniawan",
+  "Permatasari",
+  "Riyadi",
+  "Oktaviani",
+  "Pratama",
+  "Marlina",
+  "Saputra",
+  "Utami",
+  "Hidayat",
+  "Anggraini",
+  "Firmansyah",
+  "Puspitasari",
+  "Ramadhan",
+  "Safitri",
+  "Gunawan",
+  "Maharani",
+  "Wibowo",
+];
 
 function randomFrom(arr) {
   return arr[Math.floor(Math.random() * arr.length)];
@@ -36,6 +133,7 @@ function daysAgo(n) {
 }
 
 async function main() {
+  console.time("Total waktu seed");
   console.log("Menghapus data lama...");
   await prisma.followup_logs.deleteMany();
   await prisma.ai_summaries.deleteMany();
@@ -93,7 +191,7 @@ async function main() {
       is_active: false,
     },
   });
-  // Disimpan ke variabel karena id-nya dipakai lagi nanti di risk_predictions
+
   const activeModel = await prisma.model_versions.create({
     data: {
       version: "v1.1-random-forest",
@@ -104,45 +202,17 @@ async function main() {
     },
   });
 
-  console.log("Membuat customer + riwayat (30 customer)...");
+  console.log(`Menyiapkan ${TOTAL_CUSTOMERS} data customer...`);
 
-  const NAMES = [
-    "Sari Dewi",
-    "Hendra Wijaya",
-    "Rina Susanti",
-    "Agus Santoso",
-    "Melati Putri",
-    "Laras Wulandari",
-    "Doni Prasetyo",
-    "Fitri Handayani",
-    "Rudi Hartono",
-    "Nadia Permata",
-    "Irwan Kusuma",
-    "Citra Lestari",
-    "Budi Setiawan",
-    "Yuni Astuti",
-    "Eko Prabowo",
-    "Wati Suryani",
-    "Hadi Nugroho",
-    "Dewi Kurniawati",
-    "Joko Susilo",
-    "Ani Rahayu",
-    "Bambang Hermawan",
-    "Siti Aminah",
-    "Tono Wijaya",
-    "Ratna Sari",
-    "Dedi Kurniawan",
-    "Indah Permatasari",
-    "Slamet Riyadi",
-    "Yanti Oktaviani",
-    "Rizky Pratama",
-    "Lina Marlina",
-  ];
+  // Proporsi risiko: 40% low, 35% medium, 25% high
+  const lowCount = Math.floor(TOTAL_CUSTOMERS * 0.4);
+  const medCount = Math.floor(TOTAL_CUSTOMERS * 0.35);
+  const highCount = TOTAL_CUSTOMERS - lowCount - medCount;
 
   const riskProfiles = [
-    ...Array(12).fill("low"),
-    ...Array(11).fill("medium"),
-    ...Array(7).fill("high"),
+    ...Array(lowCount).fill("low"),
+    ...Array(medCount).fill("medium"),
+    ...Array(highCount).fill("high"),
   ].sort(() => Math.random() - 0.5);
 
   const labelByProfile = {
@@ -157,25 +227,36 @@ async function main() {
     "At Risk": { Active: 0.05, "Need Attention": 0.2, "At Risk": 0.75 },
   };
 
-  for (let i = 0; i < NAMES.length; i++) {
+  // 1. Insert 2000 customers sekaligus & ambil ID-nya
+  const customersPayload = Array.from({ length: TOTAL_CUSTOMERS }, (_, i) => {
+    const fullName = `${randomFrom(FIRST_NAMES)} ${randomFrom(LAST_NAMES)}`;
+    const slug = fullName.toLowerCase().replace(/\s+/g, ".");
+    return {
+      full_name: fullName,
+      phone: `08${randomInt(10, 99)}-${randomInt(1000, 9999)}-${randomInt(1000, 9999)}`,
+      email: `${slug}.${i + 1}@email.com`,
+      birth_date: daysAgo(randomInt(8000, 20000)),
+      segment: randomFrom(SEGMENTS),
+      service_type: randomFrom(SERVICES),
+      join_date: daysAgo(randomInt(60, 700)),
+      notes: null,
+    };
+  });
+
+  const createdCustomers = await prisma.customers.createManyAndReturn({
+    data: customersPayload,
+  });
+
+  // 2. Siapkan customer_packages & metadata per customer
+  const customerPackagesPayload = [];
+  const metaPerCustomer = [];
+
+  for (let i = 0; i < createdCustomers.length; i++) {
+    const customer = createdCustomers[i];
     const profile = riskProfiles[i];
-
-    const customer = await prisma.customers.create({
-      data: {
-        full_name: NAMES[i],
-        phone: `08${randomInt(10, 99)}-${randomInt(1000, 9999)}-${randomInt(1000, 9999)}`,
-        email: `${NAMES[i].toLowerCase().replace(/\s/g, ".")}@email.com`,
-        birth_date: daysAgo(randomInt(8000, 20000)),
-        segment: randomFrom(SEGMENTS),
-        service_type: randomFrom(SERVICES),
-        join_date: daysAgo(randomInt(60, 700)),
-        notes: null,
-      },
-    });
-
     const pkg = randomFrom(packageList);
-    let usedSessions;
 
+    let usedSessions;
     if (profile === "low") {
       usedSessions = randomInt(0, 3);
     } else if (profile === "medium") {
@@ -185,17 +266,37 @@ async function main() {
     }
     const remainingSessions = Math.max(0, pkg.total_sessions - usedSessions);
 
-    const customerPackage = await prisma.customer_packages.create({
-      data: {
-        customer_id: customer.id,
-        package_id: pkg.id,
-        start_date: daysAgo(randomInt(30, 60)),
-        end_date: daysAgo(-randomInt(10, 30)),
-        total_sessions: pkg.total_sessions,
-        remaining_sessions: remainingSessions,
-        status: "active",
-      },
+    customerPackagesPayload.push({
+      customer_id: customer.id,
+      package_id: pkg.id,
+      start_date: daysAgo(randomInt(30, 60)),
+      end_date: daysAgo(-randomInt(10, 30)),
+      total_sessions: pkg.total_sessions,
+      remaining_sessions: remainingSessions,
+      status: "active",
     });
+
+    metaPerCustomer.push({
+      customer,
+      profile,
+      remainingSessions,
+    });
+  }
+
+  console.log("Menyimpan customer_packages...");
+  const createdPackages = await prisma.customer_packages.createManyAndReturn({
+    data: customerPackagesPayload,
+  });
+
+  // 3. Siapkan attendance, reminders, dan risk_predictions secara bulk
+  const attendancePayload = [];
+  const remindersPayload = [];
+  const predictionsPayload = [];
+  const summaryTemplates = [];
+
+  for (let i = 0; i < metaPerCustomer.length; i++) {
+    const { customer, profile, remainingSessions } = metaPerCustomer[i];
+    const customerPackage = createdPackages[i];
 
     const totalJadwal = randomInt(6, 10);
     let attendedCount, missedCount;
@@ -217,8 +318,9 @@ async function main() {
       let status;
       if (j < attendedCount) {
         status = "attended";
-        if (lastAttendedDay === null || daysBack < lastAttendedDay)
+        if (lastAttendedDay === null || daysBack < lastAttendedDay) {
           lastAttendedDay = daysBack;
+        }
       } else if (j < attendedCount + missedCount) {
         status = "missed";
       } else {
@@ -226,15 +328,13 @@ async function main() {
       }
 
       const scheduledAt = daysAgo(daysBack);
-      await prisma.attendance.create({
-        data: {
-          customer_id: customer.id,
-          customer_package_id: customerPackage.id,
-          scheduled_at: scheduledAt,
-          status,
-          checkin_at: status === "attended" ? scheduledAt : null,
-          coach_name: randomFrom(COACHES),
-        },
+      attendancePayload.push({
+        customer_id: customer.id,
+        customer_package_id: customerPackage.id,
+        scheduled_at: scheduledAt,
+        status,
+        checkin_at: status === "attended" ? scheduledAt : null,
+        coach_name: randomFrom(COACHES),
       });
     }
 
@@ -249,67 +349,94 @@ async function main() {
             : Math.random() < 0.15;
       if (responded) reminderRespondedCount++;
 
-      await prisma.reminders.create({
-        data: {
-          customer_id: customer.id,
-          channel: "whatsapp",
-          sent_at: daysAgo(randomInt(1, 28)),
-          response_status: responded ? "replied" : "no_response",
-          responded_at: responded ? daysAgo(randomInt(0, 1)) : null,
-        },
+      remindersPayload.push({
+        customer_id: customer.id,
+        channel: "whatsapp",
+        sent_at: daysAgo(randomInt(1, 28)),
+        response_status: responded ? "replied" : "no_response",
+        responded_at: responded ? daysAgo(randomInt(0, 1)) : null,
       });
     }
 
-    // 1. Buat risk_predictions dulu, karena ai_summaries wajib terhubung ke sini
     const label = labelByProfile[profile];
-    const riskPrediction = await prisma.risk_predictions.create({
-      data: {
-        customers: { connect: { id: customer.id } },
-        model_versions: { connect: { id: activeModel.id } },
-        label,
-        probabilities: probabilitiesByLabel[label],
-        features: {
-          attendance_frequency_30d: attendedCount,
-          missed_session_count_30d: missedCount,
-          reschedule_frequency_30d: totalJadwal - attendedCount - missedCount,
-          remaining_package_sessions: remainingSessions,
-          days_until_package_expiry: randomInt(1, 30),
-          days_since_last_visit: lastAttendedDay ?? 999,
-          reminder_count_30d: reminderCount,
-          reminder_response_count_30d: reminderRespondedCount,
-        },
-        top_factors: ["days_since_last_visit", "missed_session_count_30d"],
-        priority_score:
-          label === "At Risk"
-            ? randomInt(70, 100)
-            : label === "Need Attention"
-              ? randomInt(30, 69)
-              : randomInt(0, 29),
+    predictionsPayload.push({
+      customer_id: customer.id,
+      model_version_id: activeModel.id,
+      label,
+      probabilities: probabilitiesByLabel[label],
+      features: {
+        attendance_frequency_30d: attendedCount,
+        missed_session_count_30d: missedCount,
+        reschedule_frequency_30d: totalJadwal - attendedCount - missedCount,
+        remaining_package_sessions: remainingSessions,
+        days_until_package_expiry: randomInt(1, 30),
+        days_since_last_visit: lastAttendedDay ?? 999,
+        reminder_count_30d: reminderCount,
+        reminder_response_count_30d: reminderRespondedCount,
       },
+      top_factors: ["days_since_last_visit", "missed_session_count_30d"],
+      priority_score:
+        label === "At Risk"
+          ? randomInt(70, 100)
+          : label === "Need Attention"
+            ? randomInt(30, 69)
+            : randomInt(0, 29),
     });
 
-    // 2. Baru ai_summaries, terhubung ke customer + risk_prediction di atas
-    await prisma.ai_summaries.create({
-      data: {
-        customers: { connect: { id: customer.id } },
-        risk_predictions: { connect: { id: riskPrediction.id } },
-        users: { connect: { id: adminUser.id } },
-        llm_model: "manual-seed",
-        summary: `Customer ${NAMES[i]} berada pada kategori risiko ${label}. Kehadiran 30 hari terakhir: ${attendedCount}x hadir, ${missedCount}x absen.`,
-        followup_draft: `Halo Kak ${NAMES[i]}, kami lihat sudah agak lama tidak latihan nih. Yuk balik lagi ke gym, ada jadwal kosong minggu ini!`,
-        prompt_version: "v1-seed",
-        status: "pending_review",
-      },
+    summaryTemplates.push({
+      customer_id: customer.id,
+      full_name: customer.full_name,
+      label,
+      attendedCount,
+      missedCount,
     });
   }
 
-  console.log("Seed selesai!");
-  console.log(`- 1 admin (email: admin@gymnasyum.id, password: admin123)`);
+  // Helper batch insert agar aman dari batas parameter PostgreSQL (65535 params)
+  const insertInChunks = async (model, data, chunkSize = 2000) => {
+    for (let i = 0; i < data.length; i += chunkSize) {
+      await model.createMany({ data: data.slice(i, i + chunkSize) });
+    }
+  };
+
+  console.log(`Menyimpan ${attendancePayload.length} data attendance...`);
+  await insertInChunks(prisma.attendance, attendancePayload);
+
+  console.log(`Menyimpan ${remindersPayload.length} data reminders...`);
+  await insertInChunks(prisma.reminders, remindersPayload);
+
   console.log(
-    `- ${NAMES.length} customer dengan riwayat attendance, reminder, risk_prediction & ai_summary`,
+    `Menyimpan ${predictionsPayload.length} data risk_predictions...`,
   );
-  console.log(`- 2 master paket`);
-  console.log(`- 2 model_versions`);
+  const createdPredictions = await prisma.risk_predictions.createManyAndReturn({
+    data: predictionsPayload,
+  });
+
+  // 4. Siapkan dan simpan ai_summaries
+  const summariesPayload = createdPredictions.map((pred, idx) => {
+    const info = summaryTemplates[idx];
+    return {
+      customer_id: info.customer_id,
+      prediction_id: pred.id,
+      created_by: adminUser.id,
+      llm_model: "manual-seed",
+      summary: `Customer ${info.full_name} berada pada kategori risiko ${info.label}. Kehadiran 30 hari terakhir: ${info.attendedCount}x hadir, ${info.missedCount}x absen.`,
+      followup_draft: `Halo Kak ${info.full_name}, kami lihat sudah agak lama tidak latihan nih. Yuk balik lagi ke gym, ada jadwal kosong minggu ini!`,
+      prompt_version: "v1-seed",
+      status: "pending_review",
+    };
+  });
+
+  console.log(`Menyimpan ${summariesPayload.length} data ai_summaries...`);
+  await insertInChunks(prisma.ai_summaries, summariesPayload);
+
+  console.timeEnd("Total waktu seed");
+  console.log("Seed 2.000 customer selesai!");
+  console.log(`- 1 admin (email: admin@gymnasyum.id, password: admin123)`);
+  console.log(`- ${createdCustomers.length} customer`);
+  console.log(`- ${attendancePayload.length} attendance`);
+  console.log(`- ${remindersPayload.length} reminders`);
+  console.log(`- ${createdPredictions.length} risk_predictions & ai_summaries`);
 }
 
 main()
@@ -319,4 +446,5 @@ main()
   })
   .finally(async () => {
     await prisma.$disconnect();
+    await pool.end();
   });

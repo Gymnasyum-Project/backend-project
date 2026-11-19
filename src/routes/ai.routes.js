@@ -24,6 +24,10 @@ router.patch(
   validate({ params: idParams, body: updateBody }),
   ctrl.update,
 );
-router.get("/customer/:id/followup-draft", ctrl.getDraftFollowUp);
+router.get(
+  "/customer/:customerId/followup-draft",
+  validate({ params: customerParams }),
+  ctrl.getDraftFollowUp,
+);
 
 module.exports = router;
