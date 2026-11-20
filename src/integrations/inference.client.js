@@ -2,27 +2,28 @@ const axios = require("axios");
 const env = require("../config/env");
 const AppError = require("../utils/AppError");
 
-const http = axios.create({ baseURL: env.INFERENCE_URL, timeout: 5000 });
+// Naikkan timeout ke 15 detik untuk mengantisipasi cold-start Vercel
+const http = axios.create({ baseURL: env.INFERENCE_URL, timeout: 15000 });
 
 const VALID_LABELS = ["Active", "Need Attention", "At Risk"];
 
-// Menerjemahkan respons API model (Joy) ke bentuk yang dipakai backend.
-// Sekarang API mengembalikan { segmen_kode, segmen }.
-// Kalau nanti Joy menambah label / probabilities / top_factors, kode ini
-// langsung memakainya tanpa perlu diubah lagi.
 exports.predict = async (features) => {
   let data;
   try {
     ({ data } = await http.post("/predict", features));
   } catch (e) {
-    // API model membalas { error: "..." } (status 400) kalau fitur kurang / bukan angka
-    const detail = e.response?.data?.error;
+    // FastAPI mengembalikan pesan error di `detail` (422/500), sedangkan format lama di `error`
+    const rawDetail = e.response?.data?.detail ?? e.response?.data?.error;
+    const detail = Array.isArray(rawDetail)
+      ? rawDetail.map((err) => `${err.loc?.join(".")}: ${err.msg}`).join(", ")
+      : rawDetail;
+
     throw new AppError(
       502,
       "INFERENCE_UNAVAILABLE",
       detail
         ? `Model AI menolak data: ${detail}`
-        : "Layanan model AI tidak dapat dihubungi",
+        : `Layanan model AI tidak dapat dihubungi (${e.message})`,
     );
   }
 
@@ -37,7 +38,7 @@ exports.predict = async (features) => {
 
   return {
     label,
-    probabilities: data.probabilities ?? null, // belum disediakan model → null
-    top_factors: data.top_factors ?? [], // belum disediakan model → kosong
+    probabilities: data.probabilities ?? null,
+    top_factors: data.top_factors ?? [],
   };
 };

@@ -1,18 +1,21 @@
-const router = require('express').Router();
+const router = require("express").Router();
 
-router.use('/auth', require('./auth.routes'));
-router.use('/customers', require('./customer.routes'));
-router.use('/attendance', require('./attendance.routes'));
-router.use('/packages', require('./package.routes'));
-router.use('/customer-packages', require('./package.routes'));
-router.use('/reminders', require('./reminder.routes'));
+router.use("/auth", require("./auth.routes"));
+router.use("/customers", require("./customer.routes"));
+router.use("/attendance", require("./attendance.routes"));
+router.use("/packages", require("./package.routes"));
+router.use("/customer-packages", require("./package.routes"));
+router.use("/reminders", require("./reminder.routes"));
 
 //Halaman Dashboard
-router.use('/dashboard', require('./dashboard.routes'));
+router.use("/dashboard", require("./dashboard.routes"));
 
-router.use('/model-versions', require('./model.routes'));
-router.use('/predict', require('./predict.routes'));
-router.use('/ai', require('./ai.routes'));
-router.use('/followups', require('./followup.routes'));
+router.use("/model-versions", require("./model.routes"));
+router.use("/predict", require("./predict.routes"));
+router.use("/ai", require("./ai.routes"));
+router.use("/followups", require("./followup.routes"));
+
+//Corn Routes
+routes.use("api/corn", require("./cron.routes"));
 
 module.exports = router;

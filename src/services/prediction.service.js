@@ -44,19 +44,33 @@ exports.predictCustomer = async (customerId) => {
   });
 };
 
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 exports.batchPredict = async () => {
+  const sevenDaysAgo = new Date();
+  sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+
   const customers = await prisma.customers.findMany({
-    where: { deleted_at: null },
+    where: {
+      deleted_at: null,
+      created_at: {
+        lte: sevenDaysAgo,
+      },
+    },
     select: { id: true },
   });
+  console.log(
+    `[batchPredict] Ditemukan ${customers.length} customer (usia >= 7 hari).`,
+  );
   const results = [];
   for (const c of customers) {
     try {
-      results.push(await exports.predictCustomer(c.id));
+      const prediction = await exports.predictCustomer(c.id);
+      results.push(prediction);
     } catch (e) {
       // satu customer gagal tidak menghentikan yang lain, tapi jangan diam-diam
       console.error(`[batchPredict] customer ${c.id} gagal: ${e.message}`);
     }
+    await sleep(200);
   }
   return results;
 };
