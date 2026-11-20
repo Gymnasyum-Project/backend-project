@@ -15,7 +15,4 @@ router.use("/predict", require("./predict.routes"));
 router.use("/ai", require("./ai.routes"));
 router.use("/followups", require("./followup.routes"));
 
-//Corn Routes
-router.use("api/corn", require("./cron.routes"));
-
 module.exports = router;
