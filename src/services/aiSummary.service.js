@@ -30,11 +30,11 @@ const generateInternal = async (
 
   const payload = {
     customer_id: customerId, // hanya identitas, tidak dipakai sebagai indikator
-    nama_panggilan: prediction.customers.full_name,
+    customer_name: prediction.customers.full_name,
     segmen: prediction.customers.segment,
-    risk_label: prediction.label,
+    label: prediction.label,
     top_factors: prediction.top_factors ?? [],
-    ringkasan_angka: prediction.features ?? {},
+    features: prediction.features ?? {},
   };
   const result = await llm.generateSummary(payload);
   if (!result?.summary) {

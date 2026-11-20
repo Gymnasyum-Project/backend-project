@@ -1,27 +1,36 @@
-// src/integrations/llm.client.js
-// Kontrak /generate-summary tidak berubah; hanya timeout dan header API key yang ditambahkan.
-//
-// config/env.js perlu memuat:
-//   LLM_SERVICE_URL = https://<workspace>--gym-rag-rag-web.modal.run
-//   LLM_API_KEY     = sama dengan API_KEY di Modal secret "gym-rag-secret"
 const axios = require("axios");
 const env = require("../config/env");
 const AppError = require("../utils/AppError");
 
 const http = axios.create({
-  baseURL: env.LLM_SERVICE_URL,
-  timeout: 180000, // cold start GPU + generasi Qwen bisa puluhan detik sampai menit
-  headers: { "x-api-key": env.LLM_API_KEY },
+  baseURL: env.RAG_URL,
+  timeout: 180000,
+  headers: { "x-api-key": env.RAG_API_KEY },
 });
 
 exports.generateSummary = async (payload) => {
   try {
-    const { data } = await http.post("/generate-summary", payload);
+    const normalizedPayload = {
+      customer_id: String(payload.customer_id),
+      customer_name: payload.nama_panggilan || payload.customer_name || null,
+      label: payload.risk_label || payload.label || null,
+      features: payload.ringkasan_angka || payload.features || {},
+    };
+
+    const { data } = await http.post("/generate-summary", normalizedPayload);
+
+    const fullText = data.summary_text || data.summary || data.ringkasan || "";
+    let extractedDraft = data.draft_message || null;
+    if (!extractedDraft && fullText.includes("### D.")) {
+      const partD = fullText.split("### D.")[1]?.split("### E.")[0];
+      if (partD) extractedDraft = partD.trim();
+    }
+
     return {
-      summary: data.summary_text,
-      draft_whatsapp: data.draft_message, // bisa null jika model tidak mengikuti format
-      model_used: data.model_used,
-      prompt_version: data.prompt_version,
+      summary: fullText,
+      draft_whatsapp: extractedDraft,
+      model_used: data.model_used || "qwen/qwen3.8-27b",
+      prompt_version: data.prompt_version || "v1",
     };
   } catch (e) {
     console.error(
