@@ -42,6 +42,8 @@ app.use(general);
 app.get("/health", (req, res) => res.json({ status: "ok" }));
 app.use("/api/v1", routes);
 
+app.use("/api/cron", require("./routes/cron.routes"));
+
 app.use(notFound);
 app.use(errorHandler);
 
