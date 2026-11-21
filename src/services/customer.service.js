@@ -328,7 +328,7 @@ exports.getDetail = async (id) => {
       },
     }),
     prisma.ai_summaries.findFirst({
-      where: { customer_id: customer.id },
+      where: { customer_id: customer.id, status: { not: "discarded" } },
       orderBy: { created_at: "desc" },
     }),
   ]);
@@ -341,8 +341,10 @@ exports.getDetail = async (id) => {
     ...r,
     package_name: packageName.get(attendance?.customer_package_id) ?? null,
   }));
-
-  return { ...customer, reschedules, ai_summary, stats };
+  const latestRisk = customer.risk_predictions[0] ?? null;
+  const isDraftOutdated =
+    !ai_summary || (latestRisk && ai_summary.prediction_id !== latestRisk.id);
+  return { ...customer, reschedules, ai_summary, isDraftOutdated, stats };
 };
 
 exports.update = async (id, data) => {
