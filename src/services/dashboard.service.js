@@ -1,9 +1,12 @@
 const { attempt } = require("joi");
 const prisma = require("../config/prisma");
-const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000;
+const DAY_MS = 24 * 60 * 60 * 1000;
+const THIRTY_DAYS_MS = 30 * DAY_MS;
+const SEVEN_DAYS_MS = 7 * DAY_MS;
+
 exports.getSummary = async () => {
   const totalCustomer = await prisma.customers.count();
-  const since = new Date(Date.now() - THIRTY_DAYS_MS);
+  const since = new Date(Date.now() - SEVEN_DAYS_MS);
 
   const riskPrediction = await prisma.$queryRaw`
         SELECT COALESCE(rp.label, 'Belum Diprediksi') as label, COUNT(*)::int as total FROM customers c
@@ -23,7 +26,7 @@ exports.getSummary = async () => {
             (SELECT COUNT(*)::int FROM attendance a
             WHERE a.customer_id = c.id
                 AND a.status = 'attended'
-                AND a.scheduled_at >= ${since}) AS attendance_30d,
+                AND a.scheduled_at >= ${since}) AS attendance_7d,
             (SELECT MAX(a.scheduled_at) FROM attendance a
             WHERE a.customer_id = c.id
                 AND a.status = 'attended') AS last_visit

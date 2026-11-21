@@ -22,8 +22,8 @@ const toDate = (value) => {
   return d;
 };
 
-const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000;
 const DAY_MS = 24 * 60 * 60 * 1000;
+const THIRTY_DAYS_MS = 30 * DAY_MS;
 const SEVEN_DAYS_MS = 7 * DAY_MS;
 
 const countOf = (rows, key, value) =>
@@ -88,7 +88,7 @@ exports.list = async ({ page, limit, search, risk, segment, sort } = {}) => {
   const pageNum = Math.max(parseInt(page, 10) || 1, 1);
   const limitNum = Math.min(Math.max(parseInt(limit, 10) || 20, 1), 100);
   const skip = (pageNum - 1) * limitNum;
-  const since = new Date(Date.now() - THIRTY_DAYS_MS);
+  const since = new Date(Date.now() - SEVEN_DAYS_MS);
   const searchTerm = search?.trim() || null;
 
   const riskLabel = risk ? RISK_LABEL_MAP[risk] : null;
@@ -113,7 +113,7 @@ exports.list = async ({ page, limit, search, risk, segment, sort } = {}) => {
           (SELECT COUNT(*)::int FROM attendance a
               WHERE a.customer_id = c.id
               AND a.status = 'attended'
-              AND a.scheduled_at >= ${since}) AS attendance_30d,
+              AND a.scheduled_at >= ${since}) AS attendance_7d,
           (SELECT MAX(a.scheduled_at) FROM attendance a
               WHERE a.customer_id = c.id
               AND a.status = 'attended') AS last_visit
