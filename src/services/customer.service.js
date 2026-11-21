@@ -1,13 +1,14 @@
 const AppError = require("../utils/AppError");
 const prisma = require("../config/prisma");
 const { Prisma } = require("@prisma/client");
-const { custom } = require("joi");
+const { syncExpiredPackages } = require("../utils/syncPackages"); // 1. Import helper
 
 const RISK_LABEL_MAP = {
   active: "Active",
   need_attention: "Need Attention",
   at_risk: "At Risk",
 };
+
 const toDate = (value) => {
   if (value === undefined || value === null || value === "") return undefined;
   const d = new Date(value);
@@ -20,14 +21,16 @@ const toDate = (value) => {
   }
   return d;
 };
+
 const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000;
 const DAY_MS = 24 * 60 * 60 * 1000;
 const SEVEN_DAYS_MS = 7 * DAY_MS;
+
 const countOf = (rows, key, value) =>
   rows.find((r) => r[key] === value)?._count._all ?? 0;
 
 const buildStats = async (customerId) => {
-  const since = new Date(Date.now() - THIRTY_DAYS_MS);
+  const since = new Date(Date.now() - SEVEN_DAYS_MS);
 
   const [attendanceRows, lastVisit, activePackage, reminderRows] =
     await Promise.all([
@@ -42,7 +45,11 @@ const buildStats = async (customerId) => {
         select: { scheduled_at: true, checkin_at: true },
       }),
       prisma.customer_packages.findFirst({
-        where: { customer_id: customerId, status: "active" },
+        where: {
+          customer_id: customerId,
+          status: "active",
+          end_date: { gte: new Date() },
+        },
         orderBy: { start_date: "desc" },
         select: { remaining_sessions: true, end_date: true },
       }),
@@ -52,10 +59,12 @@ const buildStats = async (customerId) => {
         _count: { _all: true },
       }),
     ]);
+
   const attended = countOf(attendanceRows, "status", "attended");
   const missed = countOf(attendanceRows, "status", "missed");
-  const lastVisitAt = lastVisit?.checkin_at ?? lastVisit?.scheduled_at ?? null;
   const rescheduled = countOf(attendanceRows, "status", "rescheduled");
+  const lastVisitAt = lastVisit?.checkin_at ?? lastVisit?.scheduled_at ?? null;
+
   return {
     attendance_7d: attended,
     missed_7d: missed,
@@ -83,7 +92,6 @@ exports.list = async ({ page, limit, search, risk, segment, sort } = {}) => {
     throw new AppError(400, "Bad Request", "Nilai risk tidak valid");
   }
 
-  // Tentukan urutan berdasarkan parameter sort
   const orderByClause =
     sort === "name"
       ? Prisma.sql`c.full_name ASC, c.id ASC`
@@ -92,7 +100,6 @@ exports.list = async ({ page, limit, search, risk, segment, sort } = {}) => {
         : Prisma.sql`rp.priority_score DESC NULLS LAST, c.id ASC`;
 
   const [rows, countRows, tabCountRows] = await Promise.all([
-    // 1. Ambil 20 data sesuai tab, filter segment, search, dan urutan
     prisma.$queryRaw`
       SELECT c.*,
           rp.label AS risk_label,
@@ -117,9 +124,11 @@ exports.list = async ({ page, limit, search, risk, segment, sort } = {}) => {
       LEFT JOIN LATERAL (
           SELECT remaining_sessions, end_date
           FROM customer_packages
-          WHERE customer_id = c.id AND status = 'active'
+          WHERE customer_id = c.id 
+            AND status = 'active'
+            AND end_date >= NOW()
           ORDER BY start_date DESC
-          LIMIT 1
+          LIMIT 1 
       ) cp ON true
       WHERE c.deleted_at IS NULL
       AND (${riskLabel}::text IS NULL OR rp.label = ${riskLabel}::text)
@@ -135,7 +144,6 @@ exports.list = async ({ page, limit, search, risk, segment, sort } = {}) => {
       LIMIT ${limitNum} OFFSET ${skip}
     `,
 
-    // 2. Total baris sesuai filter aktif (untuk menghitung sisa data pada tombol Load More)
     prisma.$queryRaw`
       SELECT COUNT(*)::int AS total
       FROM customers c
@@ -158,7 +166,6 @@ exports.list = async ({ page, limit, search, risk, segment, sort } = {}) => {
       )
     `,
 
-    // 3. Hitung jumlah customer per kategori risiko untuk angka di masing-masing Tab
     prisma.$queryRaw`
       SELECT rp.label, COUNT(*)::int AS total
       FROM customers c
@@ -212,6 +219,7 @@ const assertCustomerExists = async (id) => {
     throw new AppError(404, "NOT_FOUND", "Customer tidak ditemukan");
   }
 };
+
 const assertEmailAvailable = async (email, excludedId) => {
   if (!email) return;
   const existing = await prisma.customers.findFirst({
@@ -229,7 +237,9 @@ const assertEmailAvailable = async (email, excludedId) => {
 
 exports.create = async ({ package_id, ...customerData }) => {
   return prisma.$transaction(async (tx) => {
-    const pkg = await tx.packages.findUnique({ where: { id: package_id } });
+    const pkg = await tx.packages.findUnique({
+      where: { id: Number(package_id) },
+    });
     if (!pkg)
       throw new AppError(404, "NOT_FOUND", "Master Paket Tidak Ditemukan");
 
@@ -258,33 +268,36 @@ exports.create = async ({ package_id, ...customerData }) => {
         end_date: end,
         total_sessions: pkg.total_sessions,
         remaining_sessions: pkg.total_sessions,
-        status: "active",
+        // 4. Cek langsung apakah end_date sudah terlewati
+        status: end < new Date() ? "expired" : "active",
       },
     });
 
     return customer;
   });
 };
+
 exports.getDetail = async (id) => {
-  const thirtyDaysAgo = new Date(Date.now() - THIRTY_DAYS_MS);
+  const customerId = Number(id);
+  const sevenDaysAgo = new Date(Date.now() - SEVEN_DAYS_MS);
+
+  await syncExpiredPackages(customerId);
+
   const customer = await prisma.customers.findFirst({
     where: {
-      id: Number(id),
+      id: customerId,
       deleted_at: null,
     },
     include: {
       customer_packages: { include: { packages: true } },
-      attendance: { orderBy: { scheduled_at: "desc" }, take: 20 },
+      attendance: {
+        where: { scheduled_at: { gte: sevenDaysAgo } },
+        orderBy: { scheduled_at: "desc" },
+      },
       risk_predictions: { orderBy: { predicted_at: "desc" }, take: 1 },
       reminders: {
-        where: {
-          sent_at: {
-            gte: thirtyDaysAgo,
-          },
-        },
-        orderBy: {
-          sent_at: "desc",
-        },
+        where: { sent_at: { gte: sevenDaysAgo } },
+        orderBy: { sent_at: "desc" },
       },
     },
   });
@@ -293,12 +306,14 @@ exports.getDetail = async (id) => {
     throw new AppError(404, "NOT_FOUND", "Customer tidak ditemukan");
   }
 
-  const [stats, rescheduleRows] = await Promise.all([
+  const [stats, rescheduleRows, ai_summary] = await Promise.all([
     buildStats(customer.id),
     prisma.reschedules.findMany({
-      where: { attendance: { customer_id: customer.id } },
+      where: {
+        attendance: { customer_id: customer.id },
+        requested_at: { gte: sevenDaysAgo },
+      },
       orderBy: { requested_at: "desc" },
-      take: 20,
       select: {
         id: true,
         old_schedule: true,
@@ -308,24 +323,27 @@ exports.getDetail = async (id) => {
         attendance: { select: { customer_package_id: true } },
       },
     }),
+    prisma.ai_summaries.findFirst({
+      where: { customer_id: customer.id },
+      orderBy: { created_at: "desc" },
+    }),
   ]);
+
   const packageName = new Map(
     customer.customer_packages.map((cp) => [cp.id, cp.packages?.name ?? null]),
   );
+
   const reschedules = rescheduleRows.map(({ attendance, ...r }) => ({
     ...r,
-    package_name: packageName.get(attendance.customer_package_id) ?? null,
+    package_name: packageName.get(attendance?.customer_package_id) ?? null,
   }));
 
-  const ai_summary = await prisma.ai_summaries.findFirst({
-    where: { customer_id: customer.id },
-    orderBy: { created_at: "desc" },
-  });
   return { ...customer, reschedules, ai_summary, stats };
 };
 
 exports.update = async (id, data) => {
-  await assertCustomerExists(id);
+  const customerId = Number(id); // 3. Pastikan tipe Number
+  await assertCustomerExists(customerId);
 
   const payload = { ...data };
   if ("birth_date" in payload) payload.birth_date = toDate(payload.birth_date);
@@ -333,15 +351,16 @@ exports.update = async (id, data) => {
 
   if (payload.email) {
     payload.email = payload.email.trim().toLowerCase();
-    await assertEmailAvailable(payload.email, id);
+    await assertEmailAvailable(payload.email, customerId);
   }
-  return prisma.customers.update({ where: { id }, data: payload });
+  return prisma.customers.update({ where: { id: customerId }, data: payload });
 };
 
 exports.delete = async (id) => {
-  await assertCustomerExists(id);
+  const customerId = Number(id); // 3. Pastikan tipe Number
+  await assertCustomerExists(customerId);
   return prisma.customers.update({
-    where: { id },
+    where: { id: customerId },
     data: { deleted_at: new Date() },
   });
 };

@@ -2,10 +2,11 @@ const app = require("./app");
 const env = require("./config/env");
 const logger = require("./config/logger");
 const { startPredictionCron } = require("./jobs/batchPredict.job");
-
+const { startPackageExpiryJob } = require("./jobs/packageExpiryJob");
 const server = app.listen(env.PORT, "0.0.0.0", () => {
   logger.info(`Server berjalan di port ${env.PORT}`);
   startPredictionCron();
+  startPackageExpiryJob();
 });
 
 process.on("unhandledRejection", (reason) =>
