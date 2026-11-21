@@ -121,3 +121,39 @@ exports.getDraftFollowUp = async (customerId) => {
   const { edited_draft, ...rest } = row;
   return { ...rest, followup_draft: edited_draft ?? row.followup_draft };
 };
+
+exports.generateCustomerDraft = async (customerId) => {
+  const custId = Number(customerId);
+
+  // 1. Ambil data customer, prediksi risiko terbaru, dan paket aktif
+  const customer = await prisma.customers.findFirst({
+    where: { id: custId, deleted_at: null },
+    include: {
+      risk_predictions: { orderBy: { predicted_at: "desc" }, take: 1 },
+      customer_packages: {
+        where: { status: "active" },
+        include: { packages: true },
+        take: 1,
+      },
+    },
+  });
+
+  if (!customer) {
+    throw new AppError(404, "NOT_FOUND", "Customer tidak ditemukan");
+  }
+
+  const latestRisk = customer.risk_predictions[0] ?? null;
+
+  // 2. Panggil API LLM (Gemini / OpenAI) menggunakan konteks customer & latestRisk
+  // const draftText = await callYourLLMProvider(customer, latestRisk);
+  const draftText = `Halo ${customer.full_name}, ...`; // Ganti dengan hasil LLM kamu
+
+  // 3. Simpan hasil draft baru ke tabel ai_summaries
+  return prisma.ai_summaries.create({
+    data: {
+      customer_id: custId,
+      summary: draftText, // sesuaikan nama kolom dengan schema.prisma kamu
+      created_at: new Date(),
+    },
+  });
+};

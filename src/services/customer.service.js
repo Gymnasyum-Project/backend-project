@@ -40,8 +40,12 @@ const buildStats = async (customerId) => {
         _count: { _all: true },
       }),
       prisma.attendance.findFirst({
-        where: { customer_id: customerId, status: "attended" },
-        orderBy: { scheduled_at: "desc" },
+        where: {
+          customer_id: customerId,
+          status: "attended",
+          OR: [{ scheduled_at: { not: null } }, { checkin_at: { not: null } }],
+        },
+        orderBy: [{ scheduled_at: "desc" }, { id: "desc" }],
         select: { scheduled_at: true, checkin_at: true },
       }),
       prisma.customer_packages.findFirst({

@@ -4,7 +4,7 @@ const app = express();
 app.use(express.json());
 
 app.post("/predict", (req, res) => {
-  console.log("Fitur diterima:", req.body);
+  // console.log("Fitur diterima:", req.body);
 
   // Jawaban palsu, tapi formatnya sesuai kontrak
   res.json({
