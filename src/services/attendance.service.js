@@ -86,7 +86,10 @@ exports.updateStatus = async (id, { status, checkin_at }) => {
   });
 };
 
-exports.reschedules = async (id, { visited_at, coach_name, reason }) =>
+exports.reschedules = async (
+  id,
+  { new_schedule, visited_at, coach_name, reason },
+) =>
   prisma.$transaction(async (tx) => {
     const attendanceId = Number(id);
     const original = await tx.attendance.findUnique({
@@ -140,7 +143,7 @@ exports.reschedules = async (id, { visited_at, coach_name, reason }) =>
       data: {
         attendance_id: attendanceId,
         old_schedule: original.scheduled_at,
-        new_schedule: visited_at,
+        new_schedule: new_schedule,
         reason,
         requested_at: new Date(),
       },
