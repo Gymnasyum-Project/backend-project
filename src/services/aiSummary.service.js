@@ -1,5 +1,5 @@
 const prisma = require("../config/prisma");
-const llm = require("../integrations/llm.client");
+const rag = require("../integrations/rag.client");
 const AppError = require("../utils/AppError");
 
 const generateInternal = async (
@@ -32,11 +32,11 @@ const generateInternal = async (
     customer_id: customerId, // hanya identitas, tidak dipakai sebagai indikator
     customer_name: prediction.customers.full_name,
     segmen: prediction.customers.segment,
-    label: prediction.label,
+    risk_label: prediction.label,
     top_factors: prediction.top_factors ?? [],
     features: prediction.features ?? {},
   };
-  const result = await llm.generateSummary(payload);
+  const result = await rag.generateSummary(payload);
   if (!result?.summary) {
     throw new AppError(
       502,

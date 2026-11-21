@@ -35,7 +35,7 @@ exports.generateSummary = async (payload) => {
     );
   }
 
-  const mlLabel = normalizeLabel(payload.risk_label);
+  const mlLabel = normalizeLabel(payload.risk_label ?? payload.label);
   if (!mlLabel) {
     throw new AppError(
       409,
@@ -43,14 +43,21 @@ exports.generateSummary = async (payload) => {
       `Label risiko tidak dikenali: ${payload.risk_label}`,
     );
   }
-
+  const rawFeatures = payload.ringkasan_angka ?? payload.features ?? {};
+  const features =
+    rawFeatures &&
+    typeof rawFeatures === "object" &&
+    !Array.isArray(rawFeatures) &&
+    Object.keys(rawFeatures).length > 0
+      ? rawFeatures
+      : { customer_id: Number(payload.customer_id) };
   try {
     const { data } = await axios.post(
       `${env.RAG_URL}/followup`,
       {
         customer_id: String(payload.customer_id),
         ml_label: mlLabel,
-        features: payload.ringkasan_angka ?? {},
+        features,
         top_factors: payload.top_factors ?? [], // field tambahan, diabaikan service sampai prompt-nya diperbarui
       },
       {
@@ -58,12 +65,31 @@ exports.generateSummary = async (payload) => {
         timeout: 180000, // cold start GPU + generasi bisa lama
       },
     );
+    const summaryText = data.summary ?? data.ringkasan ?? data.answer ?? null;
+
+    // Ekstrak khusus bagian "### D. WhatsApp Follow-Up Draft" sebelum "### E."
+    let extractedDraft = null;
+    if (summaryText && summaryText.includes("### D.")) {
+      const partD = summaryText.split("### D.")[1]?.split("### E.")[0];
+      if (partD) {
+        extractedDraft = partD
+          .replace(/^.*WhatsApp Follow-Up Draft.*\n?/i, "") // hapus judul bagian D
+          .replace(/\*\*(Greeting|Isi Pesan|Closing):\*\*\n?/gi, "") // hapus label sub-bagian
+          .trim();
+      }
+    }
+
+    // Ganti placeholder [Nama Customer] dengan nama asli customer jika tersedia
+    if (extractedDraft && payload.customer_name) {
+      extractedDraft = extractedDraft.replace(
+        /\[Nama Customer\]/gi,
+        payload.customer_name,
+      );
+    }
 
     return {
-      summary: data.answer,
-      // null jika model tidak mengikuti format bagian D; jangan isi dengan seluruh jawaban,
-      // supaya admin tidak tidak sengaja mengirim analisis internal ke customer.
-      draft_whatsapp: data.followup_draft ?? null,
+      summary: summaryText,
+      draft_whatsapp: extractedDraft,
       model_used: MODEL_NAME,
       prompt_version: PROMPT_VERSION,
     };
