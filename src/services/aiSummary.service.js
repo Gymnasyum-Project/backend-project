@@ -61,7 +61,8 @@ const generateInternal = async (
         llm_model: result.model_used ?? "unknown",
         prompt_version: result.prompt_version ?? "v1",
         status: "draft",
-        created_by: userId,
+        ...(userId !== null &&
+          userId !== undefined && { created_by: Number(userId) }),
       },
     });
   });
