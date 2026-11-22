@@ -35,11 +35,19 @@ exports.autoGeneratePriorityDrafts = async ({
 
   let successCount = 0;
   let failCount = 0;
+  const systemUser = await prisma.users.findFirst({
+    orderBy: { id: "asc" },
+    select: { id: true },
+  });
+
+  if (!systemUser) {
+    throw new Error("Tidak ada data user di database untuk mengisi created_by");
+  }
 
   for (const customer of candidates) {
     try {
       // userId = null (karena digenerate oleh sistem/cron), regenerate = false
-      await aiSummaryService.generate(Number(customer.id), null, {
+      await aiSummaryService.generate(pred.customer_id, systemUser.id, {
         regenerate: false,
       });
       successCount++;
