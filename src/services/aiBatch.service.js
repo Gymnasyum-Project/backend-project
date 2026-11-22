@@ -47,7 +47,7 @@ exports.autoGeneratePriorityDrafts = async ({
   for (const customer of candidates) {
     try {
       // userId = null (karena digenerate oleh sistem/cron), regenerate = false
-      await aiSummaryService.generate(pred.customer_id, systemUser.id, {
+      await aiSummaryService.generate(Number(customer.id), systemUser.id, {
         regenerate: false,
       });
       successCount++;
