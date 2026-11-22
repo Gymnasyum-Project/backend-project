@@ -54,15 +54,17 @@ const generateInternal = async (
     }
     return tx.ai_summaries.create({
       data: {
-        customer_id: customerId,
-        prediction_id: prediction.id,
+        customers: { connect: { id: Number(customerId) } },
+        risk_predictions: { connect: { id: Number(prediction.id) } },
         summary: result.summary,
         followup_draft: result.draft_whatsapp ?? null,
         llm_model: result.model_used ?? "unknown",
         prompt_version: result.prompt_version ?? "v1",
         status: "draft",
         ...(userId !== null &&
-          userId !== undefined && { created_by: Number(userId) }),
+          userId !== undefined && {
+            users: { connect: { id: Number(userId) } },
+          }),
       },
     });
   });
