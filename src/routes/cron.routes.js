@@ -1,27 +1,22 @@
 const express = require("express");
 const router = express.Router();
-const predictionService = require("../services/prediction.service");
+const cronController = require("../controllers/cron.controller");
+const env = require("../config/env");
 
-router.get("/batch-predict", async (req, res) => {
-  // Verifikasi keamanan agar hanya Vercel Cron yang bisa memanggil endpoint ini
+// Middleware verifikasi token rahasia dari Vercel Cron
+const verifyCronSecret = (req, res, next) => {
   const authHeader = req.headers.authorization;
-  if (
-    process.env.CRON_SECRET &&
-    authHeader !== `Bearer ${process.env.CRON_SECRET}`
-  ) {
-    return res.status(401).json({ message: "Unauthorized cron trigger" });
-  }
-
-  try {
-    const results = await predictionService.batchPredict();
-    return res.status(200).json({
-      status: "ok",
-      processed: results.length,
+  if (env.CRON_SECRET && authHeader !== `Bearer ${env.CRON_SECRET}`) {
+    return res.status(401).json({
+      status: "fail",
+      message: "Unauthorized cron trigger",
     });
-  } catch (err) {
-    console.error("[Vercel Cron Error]:", err);
-    return res.status(500).json({ message: err.message });
   }
-});
+  next();
+};
+router.use(verifyCronSecret);
+
+router.get("/batch-predict", cronController.runBatchPredict);
+router.get("/batch-summary", cronController.runBatchSummary);
 
 module.exports = router;

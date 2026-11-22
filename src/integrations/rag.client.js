@@ -1,6 +1,3 @@
-// src/integrations/rag.client.js
-// Pengganti llm.client: antarmukanya sama (generateSummary), tapi memanggil service RAG + Qwen di Modal.
-//
 // .env backend (dan daftarkan juga di config/env.js):
 //   RAG_URL=https://<workspace>--gym-rag-rag-web.modal.run
 //   RAG_API_KEY=<sama dengan API_KEY di Modal secret "gym-rag-secret">

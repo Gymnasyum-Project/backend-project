@@ -1,6 +1,6 @@
 const cron = require("node-cron");
 const { runClustering } = require("../services/clusteringService");
-const { autoGeneratePriorityDrafts } = require("../services/aiBatchService");
+const { autoGeneratePriorityDrafts } = require("../services/aiBatch.service");
 
 const startDailyClusteringJob = () => {
   cron.schedule(
