@@ -277,7 +277,7 @@ async function main() {
     "Need Attention": { Active: 0.2, "Need Attention": 0.55, "At Risk": 0.25 },
     "At Risk": { Active: 0.05, "Need Attention": 0.2, "At Risk": 0.75 },
   };
-
+  const SEED_CREATED_AT = new Date("2026-11-01T08:00:00+07:00");
   // 1. Insert customer sekaligus & ambil ID-nya
   const customersPayload = Array.from({ length: TOTAL_CUSTOMERS }, (_, i) => {
     const fullName = `${randomFrom(FIRST_NAMES)} ${randomFrom(LAST_NAMES)}`;
@@ -291,6 +291,7 @@ async function main() {
       service_type: randomFrom(SERVICES),
       join_date: daysAgo(randomInt(60, 700)),
       notes: null,
+      created_at: SEED_CREATED_AT,
     };
   });
 

@@ -5,14 +5,15 @@ const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 exports.autoGeneratePriorityDrafts = async ({
   targetLabels = ["At Risk", "Need Attention"],
-  delayMs = 2500, // Jeda 2.5 detik agar aman dari rate limit LLM
+  delayMs = 1500, // jeda 1.5 detik sudah cukup aman untuk Modal
+  limit = 15, // batasi per eksekusi cron agar tidak melebihi batas waktu Vercel
 } = {}) => {
   // Cari customer prioritas yang prediction_id terbarunya belum punya ai_summary aktif
   const candidates = await prisma.$queryRaw`
-    SELECT c.id, c.full_name, rp.id AS prediction_id, rp.label
+    SELECT c.id, c.full_name, rp.id AS prediction_id, rp.label, rp.priority_score
     FROM customers c
     INNER JOIN LATERAL (
-        SELECT id, label, predicted_at
+        SELECT id, label, predicted_at, priority_score
         FROM risk_predictions
         WHERE customer_id = c.id
         ORDER BY predicted_at DESC
@@ -24,7 +25,8 @@ exports.autoGeneratePriorityDrafts = async ({
     WHERE c.deleted_at IS NULL
       AND rp.label = ANY(${targetLabels}::text[])
       AND ai.id IS NULL
-    ORDER BY rp.predicted_at DESC
+    ORDER BY rp.priority_score DESC NULLS LAST, rp.predicted_at DESC
+    LIMIT ${limit}
   `;
 
   console.log(
@@ -56,5 +58,9 @@ exports.autoGeneratePriorityDrafts = async ({
     `[AI AUTO-DRAFT] Selesai. Sukses: ${successCount}, Gagal: ${failCount}.`,
   );
 
-  return { total: candidates.length, successCount, failCount };
+  return {
+    processed: candidates.length,
+    successCount,
+    failCount,
+  };
 };

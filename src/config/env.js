@@ -18,6 +18,7 @@ const schema = Joi.object({
   RAG_URL: Joi.string().uri().required(),
   RAG_API_KEY: Joi.string().min(1).required(),
   INTERNAL_WEBHOOK_SECRET: Joi.string().min(1).optional(),
+  CRON_SECRET: Joi.string().min(1).optional().allow(""),
 
   CORS_ORIGIN: Joi.string().default("http://localhost:5173"),
 }).unknown();
