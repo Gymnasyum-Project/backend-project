@@ -15,9 +15,12 @@ const extractDraftWhatsapp = (summaryText, customerName = null) => {
   let cleaned = match[1]
     .split("\n")
     .map((line) => line.replace(/^\s*>\s*/, "").trim())
-    .filter((line) => !/^\*\*(Greeting|Isi\s*pesan|Closing)\*\*:?$/i.test(line))
-    .join("\n")
-    .replace(/\n{3,}/g, "\n\n")
+    .filter(
+      (line) =>
+        line.length > 0 &&
+        !/^\*\*(Greeting|Isi\s*pesan|Closing)\*\*:?$/i.test(line),
+    )
+    .join("\n\n")
     .trim();
 
   if (!cleaned) return null;
