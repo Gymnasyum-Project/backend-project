@@ -5,32 +5,47 @@ const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 exports.autoGeneratePriorityDrafts = async ({
   targetLabels = ["At Risk", "Need Attention"],
-  delayMs = 1500, // jeda 1.5 detik sudah cukup aman untuk Modal
-  limit = 15, // batasi per eksekusi cron agar tidak melebihi batas waktu Vercel
+  delayMs = 2000, // jeda 2 detik agar aman dari batas TPM Groq
+  limit = 10, // total 10 data (5 per label) agar aman dari timeout Vercel
 } = {}) => {
-  // Cari customer prioritas yang prediction_id terbarunya belum punya ai_summary aktif
+  const perLabelLimit = Math.max(1, Math.floor(limit / targetLabels.length));
+
+  // Ambil 5 skor tertinggi untuk masing-masing label (At Risk & Need Attention)
   const candidates = await prisma.$queryRaw`
-    SELECT c.id, c.full_name, rp.id AS prediction_id, rp.label, rp.priority_score
-    FROM customers c
-    INNER JOIN LATERAL (
-        SELECT id, label, predicted_at, priority_score
-        FROM risk_predictions
-        WHERE customer_id = c.id
-        ORDER BY predicted_at DESC
-        LIMIT 1
-    ) rp ON true
-    LEFT JOIN ai_summaries ai
-      ON ai.prediction_id = rp.id
-      AND ai.status != 'discarded'
-    WHERE c.deleted_at IS NULL
-      AND rp.label = ANY(${targetLabels}::text[])
-      AND ai.id IS NULL
-    ORDER BY rp.priority_score DESC NULLS LAST, rp.predicted_at DESC
-    LIMIT ${limit}
+    WITH ranked_candidates AS (
+      SELECT
+        c.id,
+        c.full_name,
+        rp.id AS prediction_id,
+        rp.label,
+        rp.priority_score,
+        ROW_NUMBER() OVER (
+          PARTITION BY rp.label
+          ORDER BY rp.priority_score DESC NULLS LAST, rp.predicted_at DESC
+        ) AS rn
+      FROM customers c
+      INNER JOIN LATERAL (
+          SELECT id, label, predicted_at, priority_score
+          FROM risk_predictions
+          WHERE customer_id = c.id
+          ORDER BY predicted_at DESC
+          LIMIT 1
+      ) rp ON true
+      LEFT JOIN ai_summaries ai
+        ON ai.prediction_id = rp.id
+        AND ai.status != 'discarded'
+      WHERE c.deleted_at IS NULL
+        AND rp.label = ANY(${targetLabels}::text[])
+        AND ai.id IS NULL
+    )
+    SELECT id, full_name, prediction_id, label, priority_score
+    FROM ranked_candidates
+    WHERE rn <= ${perLabelLimit}
+    ORDER BY priority_score DESC NULLS LAST, id ASC
   `;
 
   console.log(
-    `[AI AUTO-DRAFT] Memproses ${candidates.length} customer prioritas...`,
+    `[AI AUTO-DRAFT] Memproses ${candidates.length} customer prioritas (maks ${perLabelLimit} per label)...`,
   );
 
   let successCount = 0;
@@ -46,7 +61,6 @@ exports.autoGeneratePriorityDrafts = async ({
 
   for (const customer of candidates) {
     try {
-      // userId = null (karena digenerate oleh sistem/cron), regenerate = false
       await aiSummaryService.generate(Number(customer.id), systemUser.id, {
         regenerate: false,
       });
@@ -54,7 +68,7 @@ exports.autoGeneratePriorityDrafts = async ({
     } catch (err) {
       failCount++;
       console.error(
-        `[AI AUTO-DRAFT] Gagal pada customer #${customer.id}:`,
+        `[AI AUTO-DRAFT] Gagal pada customer #${customer.id} (${customer.label}):`,
         err.message,
       );
     }
